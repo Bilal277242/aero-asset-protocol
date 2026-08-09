@@ -1,0 +1,25 @@
+# Foundry
+cache/
+out/
+broadcast/
+!broadcast/*/*/run-latest.json
+docs/book/
+
+# Coverage
+lcov.info
+coverage/
+*.lcov
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Editors / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Node (future frontend)
+node_modules/

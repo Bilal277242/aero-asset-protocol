@@ -1,0 +1,12 @@
+# Force LF endings so Windows checkouts and WSL/CI builds produce identical
+# bytecode metadata and identical `forge fmt --check` results.
+* text=auto eol=lf
+
+*.sol   text eol=lf
+*.toml  text eol=lf
+*.md    text eol=lf
+*.json  text eol=lf
+*.yml   text eol=lf
+*.sh    text eol=lf
+
+lib/** linguist-vendored
