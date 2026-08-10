@@ -223,11 +223,10 @@ enum AircraftCategory {
 }
 
 struct Aircraft {
-    // ── slot 0 ── 12 / 32
+    // ── slot 0 ── 11 / 32
     uint64 manufacturerOrgId;    // 8 — 0 if OEM is not a registered org
     uint16 manufactureYear;      // 2
     AircraftCategory category;   // 1
-    uint8  __reserved;           // 1
     // ── slot 1 ──
     bytes32 model;               // short string, e.g. "A320-214"
     // ── slot 2 ──
@@ -279,6 +278,19 @@ The single most important structural invariant in the asset layer:
 A component can never be installed on two aircraft simultaneously, because
 installation state is stored on the *component*, not as a list on the aircraft. There
 is no data structure in which the conflicting fact could be represented.
+
+The implementation funnels **every** exit from `INSTALLED` through a single detach
+path, rather than clearing the parent in each transition that happens to leave it.
+Sending an installed engine for repair, quarantining it, or scrapping it all detach it
+first — so a new transition added later cannot forget to, and the invariant does not
+depend on remembering.
+
+Positions are scoped per `(parent, kind)`: engine position 1 and APU position 1 are
+different physical locations, so both may be occupied at once, while two engines
+cannot share position 1 (`INV-COMP-03`).
+
+**Aircraft cannot nest.** A component's parent must be an asset of kind `AIRCRAFT`,
+and a component may not be installed into itself.
 
 Reverse index for passport reads:
 

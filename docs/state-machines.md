@@ -185,9 +185,23 @@ Guards on `install(componentId, parentAssetId, position)`:
 4. caller owns **both** the component and the parent, or is acting for the owning org
 5. `position` is not already occupied by another installed component of the same kind
 
-Guards on `remove(componentId)`: status is `INSTALLED`; caller owns the parent.
-`removeComponent` sets `parentAssetId = 0` and `status = UNINSTALLED` **in the same
-write**, which is what makes `INV-COMP-01` unbreakable.
+Guards on `removeComponent(componentId)`: status is `INSTALLED`; caller owns the
+component.
+
+**Every exit from `INSTALLED` detaches, not just `removeComponent`.** The
+implementation routes all status writes through one path that clears
+`parentAssetId`, frees the position index and emits `ComponentRemoved` whenever the
+prior status was `INSTALLED`. Sending an installed engine for repair, quarantining it
+or scrapping it therefore all detach it first. This is what makes `INV-COMP-01`
+unbreakable — a transition added later cannot forget to clear the parent, because no
+transition clears it individually.
+
+`INSTALLED` is reachable **only** through `installComponent`, which carries the parent
+and position that the generic status setter does not. `setComponentStatus` rejects it
+with `UseInstallComponent` rather than silently ignoring the request.
+
+A `QUARANTINED` part cannot return directly to service: it must pass through
+`UNINSTALLED` first, where it can be inspected.
 
 A component whose parent aircraft is `DESTROYED` is *not* auto-removed — that would be
 an unbounded loop over the component list. It is removed explicitly, or read as

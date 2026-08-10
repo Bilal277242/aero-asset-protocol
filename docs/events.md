@@ -68,7 +68,9 @@ event AircraftRegistered(
     uint256 indexed assetId, uint256 indexed manufacturerOrgId, bytes32 model,
     uint16 manufactureYear, AircraftCategory category
 );
-event AircraftUpdated(uint256 indexed assetId, bytes32 model, bytes32 registrationMarkHash);
+event AircraftUpdated(
+    uint256 indexed assetId, bytes32 model, AircraftCategory category, bytes32 registrationMarkHash
+);
 
 event ComponentRegistered(uint256 indexed assetId, ComponentKind kind, bytes32 partNumber);
 event ComponentInstalled(uint256 indexed componentAssetId, uint256 indexed parentAssetId, uint16 position);

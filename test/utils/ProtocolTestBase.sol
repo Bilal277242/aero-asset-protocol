@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {AircraftRegistry} from "../../src/assets/AircraftRegistry.sol";
 import {AssetRegistry} from "../../src/assets/AssetRegistry.sol";
+import {ComponentRegistry} from "../../src/assets/ComponentRegistry.sol";
 import {ProtocolAddressRegistry} from "../../src/core/ProtocolAddressRegistry.sol";
 import {RoleManager} from "../../src/core/RoleManager.sol";
 import {CredentialRegistry} from "../../src/identity/CredentialRegistry.sol";
 import {OrganizationRegistry} from "../../src/identity/OrganizationRegistry.sol";
+import {IAircraftRegistry} from "../../src/interfaces/IAircraftRegistry.sol";
 import {IAssetRegistry} from "../../src/interfaces/IAssetRegistry.sol";
+import {IComponentRegistry} from "../../src/interfaces/IComponentRegistry.sol";
 import {ICredentialRegistry} from "../../src/interfaces/ICredentialRegistry.sol";
 import {IOrganizationRegistry} from "../../src/interfaces/IOrganizationRegistry.sol";
 import {ProtocolAddressKeys} from "../../src/libraries/ProtocolAddressKeys.sol";
@@ -49,6 +53,14 @@ abstract contract ProtocolTestBase is BaseTest {
     AssetRegistry internal assetRegistry;
     /// @notice The `AssetRegistry` implementation behind the proxy.
     address internal assetRegistryImpl;
+    /// @notice `AircraftRegistry` accessed through its proxy.
+    AircraftRegistry internal aircraftRegistry;
+    /// @notice The `AircraftRegistry` implementation behind the proxy.
+    address internal aircraftRegistryImpl;
+    /// @notice `ComponentRegistry` accessed through its proxy.
+    ComponentRegistry internal componentRegistry;
+    /// @notice The `ComponentRegistry` implementation behind the proxy.
+    address internal componentRegistryImpl;
 
     /*//////////////////////////////////////////////////////////////
                                 FIXTURES
@@ -123,11 +135,38 @@ abstract contract ProtocolTestBase is BaseTest {
             )
         );
 
+        aircraftRegistryImpl = address(new AircraftRegistry());
+        aircraftRegistry = AircraftRegistry(
+            address(
+                new ERC1967Proxy(
+                    aircraftRegistryImpl,
+                    abi.encodeCall(AircraftRegistry.initialize, (address(roleManager), address(addressRegistry)))
+                )
+            )
+        );
+
+        componentRegistryImpl = address(new ComponentRegistry());
+        componentRegistry = ComponentRegistry(
+            address(
+                new ERC1967Proxy(
+                    componentRegistryImpl,
+                    abi.encodeCall(ComponentRegistry.initialize, (address(roleManager), address(addressRegistry)))
+                )
+            )
+        );
+
+        // The specialization registries mint asset ids on behalf of organizations
+        // after checking membership themselves. Never granted to an EOA.
+        roleManager.grantRole(ProtocolRoles.ASSET_MINTER_ROLE, address(aircraftRegistry));
+        roleManager.grantRole(ProtocolRoles.ASSET_MINTER_ROLE, address(componentRegistry));
+
         addressRegistry.setAddress(ProtocolAddressKeys.ROLE_MANAGER, address(roleManager));
         addressRegistry.setAddress(ProtocolAddressKeys.ORGANIZATION_REGISTRY, address(orgRegistry));
         addressRegistry.setAddress(ProtocolAddressKeys.CREDENTIAL_REGISTRY, address(credentialRegistry));
         addressRegistry.setAddress(ProtocolAddressKeys.ASSET_OWNERSHIP, address(assetOwnership));
         addressRegistry.setAddress(ProtocolAddressKeys.ASSET_REGISTRY, address(assetRegistry));
+        addressRegistry.setAddress(ProtocolAddressKeys.AIRCRAFT_REGISTRY, address(aircraftRegistry));
+        addressRegistry.setAddress(ProtocolAddressKeys.COMPONENT_REGISTRY, address(componentRegistry));
 
         vm.stopPrank();
 
@@ -141,6 +180,10 @@ abstract contract ProtocolTestBase is BaseTest {
         vm.label(assetOwnershipImpl, "AssetOwnershipImpl");
         vm.label(address(assetRegistry), "AssetRegistry");
         vm.label(assetRegistryImpl, "AssetRegistryImpl");
+        vm.label(address(aircraftRegistry), "AircraftRegistry");
+        vm.label(aircraftRegistryImpl, "AircraftRegistryImpl");
+        vm.label(address(componentRegistry), "ComponentRegistry");
+        vm.label(componentRegistryImpl, "ComponentRegistryImpl");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -224,6 +267,63 @@ abstract contract ProtocolTestBase is BaseTest {
     function _defaultAircraft() internal returns (uint256 orgId, uint256 assetId) {
         orgId = _defaultVerifiedOrg();
         assetId = _registerAsset(orgId, alice, alice, IAssetRegistry.AssetKind.AIRCRAFT, keccak256("MSN-12345"));
+    }
+
+    /// @notice Registers an aircraft through `AircraftRegistry`.
+    /// @param orgId The registering organization.
+    /// @param actor An address that may act for `orgId`.
+    /// @param owner The initial owner.
+    /// @param serialHash Manufacturer serial-number commitment.
+    /// @return assetId The newly minted aircraft asset id.
+    function _registerAircraft(uint256 orgId, address actor, address owner, bytes32 serialHash)
+        internal
+        returns (uint256 assetId)
+    {
+        IAircraftRegistry.AircraftParams memory params = IAircraftRegistry.AircraftParams({
+            orgId: orgId,
+            owner: owner,
+            serialNumberHash: serialHash,
+            metadataHash: keccak256("aircraft-meta"),
+            uri: "ipfs://aircraft",
+            manufacturerOrgId: 0,
+            manufacturerName: "Airbus",
+            model: "A320-214",
+            manufactureYear: 2015,
+            category: IAircraftRegistry.AircraftCategory.COMMERCIAL_TRANSPORT,
+            registrationMarkHash: keccak256("D-AIZA")
+        });
+
+        vm.prank(actor);
+        assetId = aircraftRegistry.registerAircraft(params);
+    }
+
+    /// @notice Registers a component through `ComponentRegistry`.
+    /// @param orgId The registering organization.
+    /// @param actor An address that may act for `orgId`.
+    /// @param owner The initial owner.
+    /// @param kind The component category.
+    /// @param serialHash Component serial-number commitment.
+    /// @return assetId The newly minted component asset id.
+    function _registerComponent(
+        uint256 orgId,
+        address actor,
+        address owner,
+        IComponentRegistry.ComponentKind kind,
+        bytes32 serialHash
+    ) internal returns (uint256 assetId) {
+        IComponentRegistry.ComponentParams memory params =
+            IComponentRegistry.ComponentParams({
+                orgId: orgId,
+                owner: owner,
+                serialNumberHash: serialHash,
+                metadataHash: keccak256("component-meta"),
+                uri: "ipfs://component",
+                kind: kind,
+                partNumber: "CFM56-5B4"
+            });
+
+        vm.prank(actor);
+        assetId = componentRegistry.registerComponent(params);
     }
 
     /// @notice Grants `SETTLEMENT_ROLE` to an address so it can act as an escrow.

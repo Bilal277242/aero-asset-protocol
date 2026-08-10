@@ -43,12 +43,12 @@ Legend — `ADMIN` = `PROTOCOL_ADMIN_ROLE` · `OWNER` = asset owner per `AssetOw
 | `.updateAssetMetadata` | `OWNER` or registrar `ORG` | Blocked once terminal. |
 | `.setAssetStatus` | `OWNER` | Transition must be legal. Terminal status freezes ownership atomically. |
 | `.verifyAsset` / `.unverifyAsset` | `ASSET_VERIFIER_ROLE` | Separate from registration. |
-| `AircraftRegistry.registerAircraft` | `ORG` | Mints via `AssetRegistry`, attaches aircraft data. |
-| `.updateAircraft` | `OWNER` | |
-| `ComponentRegistry.registerComponent` | `ORG` | |
-| `.installComponent` / `.removeComponent` | `OWNER` of both component and parent | |
-| `.setComponentStatus` | `OWNER` | |
-| `.quarantineComponent` | `OWNER` or `ASSET_VERIFIER_ROLE` | Verifier may quarantine a suspect part unilaterally. |
+| `AircraftRegistry.registerAircraft` | `ORG` | Mints via `AssetRegistry` under `ASSET_MINTER_ROLE`, attaches airframe data. |
+| `.updateAircraft` | `OWNER` | Model, category and tail number only. Build facts are immutable. |
+| `ComponentRegistry.registerComponent` | `ORG` | Generic `AssetKind` is derived from `ComponentKind`, never caller-supplied. |
+| `.installComponent` | `OWNER` of **both** component and parent | Parent must be a non-terminal `AIRCRAFT`; position must be free for that kind. |
+| `.removeComponent` | `OWNER` of the component | |
+| `.setComponentStatus` | `OWNER` of the component | Cannot reach `INSTALLED`. Leaving `INSTALLED` detaches. |
 | `AssetOwnership.initializeOwnership` | `AssetRegistry` only | Address-registry check, not a role. |
 | `.freezeTransfers` | `AssetRegistry` only | Permanent; no unfreeze exists. |
 | `.initiateTransfer` | `OWNER` | Blocked while locked or frozen. |

@@ -78,15 +78,19 @@ error AssetNotVerified(uint256 assetId);
 // AircraftRegistry
 error AircraftNotFound(uint256 assetId);
 error InvalidManufactureYear(uint16 year);
+error InvalidAircraftCategory(AircraftCategory provided);
+error MissingManufacturer();
 
 // ComponentRegistry
 error ComponentNotFound(uint256 assetId);
 error ComponentNotInstalled(uint256 assetId);
 error ComponentAlreadyInstalled(uint256 assetId, uint256 parentAssetId);
 error InvalidComponentTransition(ComponentStatus from, ComponentStatus to);
-error PositionOccupied(uint256 parentAssetId, ComponentKind kind, uint16 position);
-error ParentNotAircraft(uint256 parentAssetId, AssetKind kind);
+error InvalidComponentKind(ComponentKind provided);
+error PositionOccupied(uint256 parentAssetId, ComponentKind kind, uint16 position, uint256 occupantAssetId);
+error ParentNotAircraft(uint256 parentAssetId);
 error SelfInstallation(uint256 assetId);
+error UseInstallComponent();
 
 // AssetOwnership
 error OwnershipNotFound(uint256 assetId);

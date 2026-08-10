@@ -95,7 +95,7 @@ valuation, DeFi yield, decentralized arbitration, on-chain document storage.
 | 1 | `ProtocolAddressRegistry`, `RoleManager`, `OrganizationRegistry` | ✅ complete |
 | 2 | `CredentialRegistry` | ✅ complete |
 | 3 | `AssetRegistry`, `AssetOwnership` | ✅ complete |
-| 4 | `AircraftRegistry`, `ComponentRegistry` | ⬜ |
+| 4 | `AircraftRegistry`, `ComponentRegistry` | ✅ complete |
 | 5 | `DocumentRegistry`, `MaintenanceRegistry`, `AssetPassport` | ⬜ |
 | 6 | `FeeManager`, `Marketplace` | ⬜ |
 | 7 | `EscrowFactory`, `Escrow`, disputes | ⬜ |
