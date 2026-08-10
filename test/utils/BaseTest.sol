@@ -16,6 +16,8 @@ abstract contract BaseTest is Test {
 
     /// @notice Holds `DEFAULT_ADMIN_ROLE`; stands in for the production multisig.
     address internal protocolAdmin;
+    /// @notice Holds `PAUSER_ROLE`. Can pause and deliberately cannot unpause.
+    address internal pauser;
     /// @notice Verifies organizations and promotes them out of the pending state.
     address internal orgVerifier;
     /// @notice Issues and revokes aviation credentials.
@@ -54,6 +56,7 @@ abstract contract BaseTest is Test {
     /// @notice Creates and labels the shared actor set and warps to a realistic epoch.
     function setUp() public virtual {
         protocolAdmin = _actor("protocolAdmin");
+        pauser = _actor("pauser");
         orgVerifier = _actor("orgVerifier");
         credentialIssuer = _actor("credentialIssuer");
         mro = _actor("mro");
@@ -89,6 +92,7 @@ abstract contract BaseTest is Test {
     function _assumeUnprivileged(address account) internal view {
         vm.assume(account != address(0));
         vm.assume(account != protocolAdmin);
+        vm.assume(account != pauser);
         vm.assume(account != orgVerifier);
         vm.assume(account != credentialIssuer);
         vm.assume(account != mro);

@@ -56,7 +56,7 @@ no upgrade to be compatible with.
 
 | Struct | Slots | Bytes used / 32 in slot 0 |
 |---|---|---|
-| `Organization` | 3 | 30 |
+| `Organization` | 3 | 32 (full) |
 | `Credential` | 3 | 32 (full) |
 | `Asset` | 3 | 28 |
 | `Aircraft` | 4 | 12 |

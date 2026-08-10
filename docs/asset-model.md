@@ -70,7 +70,7 @@ enum OrganizationStatus {
 
 ```solidity
 struct Organization {
-    // ── slot 0 ── 30 / 32 bytes used
+    // ── slot 0 ── 32 / 32 bytes, exactly full
     address admin;              // 20 — controlling address; may transfer
     uint40  registeredAt;       //  5
     uint40  verifiedAt;         //  5 — 0 until verified

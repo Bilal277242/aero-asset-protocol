@@ -23,8 +23,10 @@ Legend — `ADMIN` = `PROTOCOL_ADMIN_ROLE` · `OWNER` = asset owner per `AssetOw
 |---|---|---|
 | `OrganizationRegistry.registerOrganization` | — | Self-registers to `PENDING`. Name hash must be unique. |
 | `.updateOrganization` | org `admin` | Metadata only; cannot change type or status. |
-| `.transferOrgAdmin` / `.acceptOrgAdmin` | org `admin` / pending admin | Two-step. |
-| `.addOperator` / `.removeOperator` | org `admin` | |
+| `.transferOrganizationAdmin` | org `admin` | Step 1 of 2. |
+| `.acceptOrganizationAdmin` | pending admin | Step 2 of 2. |
+| `.cancelOrganizationAdminTransfer` | org `admin` **or** pending admin | Either side may abandon it. |
+| `.setOperator` | org `admin` | Operators may act for the org but cannot manage admins or operators. |
 | `.verifyOrganization` / `.rejectOrganization` | `ORG_VERIFIER_ROLE` | |
 | `.suspendOrganization` / `.reactivateOrganization` | `ORG_VERIFIER_ROLE` | |
 | `.revokeOrganization` | `ADMIN` | Terminal, timelocked. |

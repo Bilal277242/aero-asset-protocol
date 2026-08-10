@@ -92,7 +92,7 @@ valuation, DeFi yield, decentralized arbitration, on-chain document storage.
 | Phase | Scope | Status |
 |---|---|---|
 | 0 | Specification + Foundry foundation | ✅ complete |
-| 1 | `ProtocolAddressRegistry`, `RoleManager`, `OrganizationRegistry` | ⬜ |
+| 1 | `ProtocolAddressRegistry`, `RoleManager`, `OrganizationRegistry` | ✅ complete |
 | 2 | `CredentialRegistry` | ⬜ |
 | 3 | `AssetRegistry`, `AssetOwnership` | ⬜ |
 | 4 | `AircraftRegistry`, `ComponentRegistry` | ⬜ |

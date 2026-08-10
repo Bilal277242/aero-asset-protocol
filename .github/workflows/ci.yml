@@ -50,10 +50,12 @@ jobs:
           version: stable
 
       - name: Generate coverage
-        # ir-minimum keeps `forge coverage` compiling with the optimizer settings
-        # this repo uses; invariant suites are excluded because they distort
-        # line coverage without adding signal.
-        run: forge coverage --ir-minimum --no-match-path "test/invariant/**" --report lcov --report summary
+        # Deliberately NOT --ir-minimum. It compiles, but its source mapping is
+        # lossy: it reported ~14 executed lines as uncovered, including whole
+        # function bodies that tests demonstrably reach. Add it back only if this
+        # build starts hitting "stack too deep", and re-verify the numbers if so.
+        # Invariant suites are excluded: they distort line coverage without signal.
+        run: forge coverage --no-match-path "test/invariant/**" --report lcov --report summary
 
       - uses: codecov/codecov-action@v4
         continue-on-error: true

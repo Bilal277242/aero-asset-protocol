@@ -46,6 +46,8 @@ error InvalidOrganizationTransition(OrganizationStatus from, OrganizationStatus 
 error NotOrganizationAdmin(uint256 orgId, address caller);
 error NotActingForOrganization(uint256 orgId, address caller);
 error NoPendingAdminTransfer(uint256 orgId);
+error NotPendingAdmin(uint256 orgId, address caller, address pendingAdmin);
+error AdminTransferToCurrentAdmin(uint256 orgId);
 error InvalidOrganizationType(OrganizationType provided);
 
 // CredentialRegistry

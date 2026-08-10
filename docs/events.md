@@ -40,6 +40,7 @@ event OrganizationStatusChanged(
     uint256 indexed orgId, OrganizationStatus indexed oldStatus, OrganizationStatus indexed newStatus, address by
 );
 event OrganizationAdminTransferStarted(uint256 indexed orgId, address indexed from, address indexed to);
+event OrganizationAdminTransferCancelled(uint256 indexed orgId, address indexed cancelledBy);
 event OrganizationAdminTransferred(uint256 indexed orgId, address indexed from, address indexed to);
 event OrganizationOperatorSet(uint256 indexed orgId, address indexed operator, bool allowed);
 
