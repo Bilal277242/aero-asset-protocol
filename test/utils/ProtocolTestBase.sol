@@ -3,7 +3,9 @@ pragma solidity 0.8.28;
 
 import {ProtocolAddressRegistry} from "../../src/core/ProtocolAddressRegistry.sol";
 import {RoleManager} from "../../src/core/RoleManager.sol";
+import {CredentialRegistry} from "../../src/identity/CredentialRegistry.sol";
 import {OrganizationRegistry} from "../../src/identity/OrganizationRegistry.sol";
+import {ICredentialRegistry} from "../../src/interfaces/ICredentialRegistry.sol";
 import {IOrganizationRegistry} from "../../src/interfaces/IOrganizationRegistry.sol";
 import {ProtocolAddressKeys} from "../../src/libraries/ProtocolAddressKeys.sol";
 import {ProtocolRoles} from "../../src/libraries/ProtocolRoles.sol";
@@ -32,6 +34,10 @@ abstract contract ProtocolTestBase is BaseTest {
     OrganizationRegistry internal orgRegistry;
     /// @notice The `OrganizationRegistry` implementation behind the proxy.
     address internal orgRegistryImpl;
+    /// @notice `CredentialRegistry` accessed through its proxy.
+    CredentialRegistry internal credentialRegistry;
+    /// @notice The `CredentialRegistry` implementation behind the proxy.
+    address internal credentialRegistryImpl;
 
     /*//////////////////////////////////////////////////////////////
                                 FIXTURES
@@ -76,8 +82,19 @@ abstract contract ProtocolTestBase is BaseTest {
             )
         );
 
+        credentialRegistryImpl = address(new CredentialRegistry());
+        credentialRegistry = CredentialRegistry(
+            address(
+                new ERC1967Proxy(
+                    credentialRegistryImpl,
+                    abi.encodeCall(CredentialRegistry.initialize, (address(roleManager), address(addressRegistry)))
+                )
+            )
+        );
+
         addressRegistry.setAddress(ProtocolAddressKeys.ROLE_MANAGER, address(roleManager));
         addressRegistry.setAddress(ProtocolAddressKeys.ORGANIZATION_REGISTRY, address(orgRegistry));
+        addressRegistry.setAddress(ProtocolAddressKeys.CREDENTIAL_REGISTRY, address(credentialRegistry));
 
         vm.stopPrank();
 
@@ -85,6 +102,8 @@ abstract contract ProtocolTestBase is BaseTest {
         vm.label(address(addressRegistry), "ProtocolAddressRegistry");
         vm.label(address(orgRegistry), "OrganizationRegistry");
         vm.label(orgRegistryImpl, "OrganizationRegistryImpl");
+        vm.label(address(credentialRegistry), "CredentialRegistry");
+        vm.label(credentialRegistryImpl, "CredentialRegistryImpl");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -122,5 +141,33 @@ abstract contract ProtocolTestBase is BaseTest {
     /// @return orgId The fixture organization id.
     function _defaultVerifiedOrg() internal returns (uint256 orgId) {
         orgId = _registerVerifiedOrg(alice, ORG_NAME_HASH, IOrganizationRegistry.OrganizationType.AIRLINE);
+    }
+
+    /// @notice Registers a verified MRO organization under `mro`.
+    /// @return orgId The MRO organization id.
+    function _verifiedMro() internal returns (uint256 orgId) {
+        orgId = _registerVerifiedOrg(mro, keccak256("Fixture MRO Ltd"), IOrganizationRegistry.OrganizationType.MRO);
+    }
+
+    /// @notice Issues a credential to an organization with a one-year expiry.
+    /// @param subjectOrgId The subject organization.
+    /// @param credType The credential category.
+    /// @return credentialId The newly issued credential id.
+    function _issueOrgCredential(uint256 subjectOrgId, ICredentialRegistry.CredentialType credType)
+        internal
+        returns (uint256 credentialId)
+    {
+        vm.prank(credentialIssuer);
+        credentialId = credentialRegistry.issueCredential(
+            0, address(0), subjectOrgId, credType, uint40(block.timestamp + 365 days), keccak256("credential-doc")
+        );
+    }
+
+    /// @notice Registers a verified MRO holding a valid maintenance-authority credential.
+    /// @return orgId The MRO organization id.
+    /// @return credentialId The maintenance-authority credential id.
+    function _credentialedMro() internal returns (uint256 orgId, uint256 credentialId) {
+        orgId = _verifiedMro();
+        credentialId = _issueOrgCredential(orgId, ICredentialRegistry.CredentialType.MAINTENANCE_AUTHORITY);
     }
 }

@@ -92,6 +92,22 @@ Permissionless expiry exists so that on-chain state can be brought into agreemen
 elapsed time by any observer. It cannot be abused: the guard makes it a no-op-or-revert
 for any credential that has not genuinely expired.
 
+**Reinstatement has two guards beyond the transition table.** A credential whose
+`expiresAt` passed while it was suspended cannot be reinstated — reinstatement must not
+resurrect authority that time has already ended; the correct action is to issue a new
+credential. And reinstatement fails if another credential of the same type has become
+valid for the same organization in the meantime, which would otherwise produce two
+simultaneously-valid credentials and break `INV-CRED-04`.
+
+**At most one valid credential per `(subjectOrgId, credentialType)`.** Issuance reverts
+with `DuplicateValidCredential` if the organization already holds a valid one. This is
+what lets `validCredentialOfType` answer in O(1), so Phase 5's maintenance
+authorization needs no loop over an organization's credential history. Renewal is
+therefore explicit: revoke the incumbent first, or simply let it lapse — a credential
+past `expiresAt` stops blocking issuance immediately, with no expiry transaction
+required. Credentials with an address-only subject are exempt, since they are not
+indexed.
+
 ---
 
 ## 3. Asset

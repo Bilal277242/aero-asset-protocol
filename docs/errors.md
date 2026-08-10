@@ -58,6 +58,9 @@ error CredentialNotExpired(uint256 credentialId, uint40 expiresAt);
 error InvalidCredentialTransition(CredentialStatus from, CredentialStatus to);
 error InvalidCredentialSubject();          // subject address and subjectOrgId both zero
 error InvalidCredentialType(CredentialType provided);
+error SubjectOrganizationNotVerified(uint256 orgId);
+error IssuerOrganizationNotFound(uint256 orgId);
+error DuplicateValidCredential(uint256 subjectOrgId, CredentialType credType, uint256 existingCredentialId);
 ```
 
 ## Assets

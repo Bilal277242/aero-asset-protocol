@@ -38,9 +38,18 @@ decentralized arbitration, and on-chain document storage.
 
 ## 2. Layering
 
-Five layers. **Every dependency points downward — never sideways within a layer, never
-upward.** This is the property that keeps the system auditable as it grows, and it is
-enforced by test `test/integration/LayerBoundaries.t.sol`.
+Five layers. **Every state-changing dependency points downward — never sideways within
+a layer, never upward.** This is the property that keeps the system auditable as it
+grows, and it is enforced by test `test/integration/LayerBoundaries.t.sol`.
+
+**One qualified exception: `view`-only reads between peers in the same layer are
+permitted.** `CredentialRegistry` reads `OrganizationRegistry` to validate a
+credential's subject at issuance. The alternative — treating organization ids as
+opaque integers — would allow issuing a maintenance authority to an organization that
+does not exist, which is a data-integrity hole the registry is specifically supposed to
+close. A `view` read creates no reentrancy surface, no write ordering to reason about,
+and no upgrade coupling. A module must never call a *state-changing* function on a
+peer in its own layer.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐

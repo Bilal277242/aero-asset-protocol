@@ -4,10 +4,11 @@ Blockchain infrastructure for aviation assets — a verified asset registry, dig
 asset passport, maintenance and document proofs, ownership tracking, marketplace and
 escrow.
 
-> **Status: Phase 1 complete** — protocol core (`RoleManager`,
-> `ProtocolAddressRegistry`, `ProtocolModuleUpgradeable`) and `OrganizationRegistry`
-> are implemented and tested. Layers L2–L4 are not built yet. This is not audited
-> software and must not be used with real funds.
+> **Status: Phase 2 complete** — protocol core (`RoleManager`,
+> `ProtocolAddressRegistry`, `ProtocolModuleUpgradeable`) and the full identity layer
+> (`OrganizationRegistry`, `CredentialRegistry`) are implemented and tested. Layers
+> L2–L4 are not built yet. This is not audited software and must not be used with real
+> funds.
 
 ---
 
@@ -114,7 +115,7 @@ Deployment (Phase 9) uses staged scripts; copy `.env.example` to `.env` first.
 |---|---|---|
 | 0 | Specification + Foundry foundation | ✅ |
 | 1 | Protocol core + `OrganizationRegistry` | ✅ |
-| 2 | `CredentialRegistry` | ⬜ |
+| 2 | `CredentialRegistry` | ✅ |
 | 3 | `AssetRegistry` + `AssetOwnership` | ⬜ |
 | 4 | `AircraftRegistry` + `ComponentRegistry` | ⬜ |
 | 5 | Provenance + `AssetPassport` | ⬜ |

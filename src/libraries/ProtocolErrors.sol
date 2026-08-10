@@ -28,6 +28,15 @@ error MissingRole(bytes32 role, address account);
 /// @param max The maximum representable value for the target field.
 error ValueTooLarge(uint256 value, uint256 max);
 
+/// @notice Thrown when a caller-supplied deadline is not strictly in the future.
+/// @dev Applies to credential expiries, listing expiries and escrow deadlines. A
+///      deadline at exactly `block.timestamp` is already past: every validity check in
+///      the protocol uses `deadline > now`, so accepting one would create a record
+///      that is expired the moment it is written.
+/// @param deadline The offending deadline.
+/// @param nowTs The block timestamp it was compared against.
+error DeadlineInPast(uint40 deadline, uint40 nowTs);
+
 /// @notice Thrown when a required `ProtocolAddressRegistry` entry has never been set.
 /// @param key The address-registry key that resolved to `address(0)`.
 error AddressNotRegistered(bytes32 key);

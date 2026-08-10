@@ -20,6 +20,8 @@ remainder were derived from the state machines and data model.
 | `INV-CRED-01` | `isValid(id) ⟹ status == ACTIVE ∧ (expiresAt == 0 ∨ expiresAt > now)`. | Direct assertion. |
 | `INV-CRED-02` | A credential past `expiresAt` is never `isValid`, regardless of stored `status`. | Handler warps time past random expiries. |
 | `INV-CRED-03` | **(roadmap)** A `REVOKED` or `EXPIRED` credential never becomes `ACTIVE` again. Reissuance produces a strictly greater id. | Ghost set of terminal ids; assert none re-enters `ACTIVE`. |
+| `INV-CRED-04` | At most one **valid** credential exists per `(subjectOrgId, credType)` pair, and `validCredentialOfType` returns exactly that one, or 0. | Sweep all credentials, group by `(org, type)`, assert at most one passes `isValid` and that it matches the O(1) lookup. |
+| `INV-CRED-05` | The `activeOrgCredential` index is never *stale-positive*: if it returns a non-zero id, that credential is genuinely valid. It may legitimately hold a lapsed id internally, which the accessor filters. | Compare the raw index slot against `validCredentialOfType` after time warps. |
 
 ## Assets
 
