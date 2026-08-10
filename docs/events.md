@@ -77,10 +77,12 @@ event ComponentStatusChanged(
     uint256 indexed componentAssetId, ComponentStatus indexed oldStatus, ComponentStatus indexed newStatus
 );
 
+event OwnershipInitialized(uint256 indexed assetId, address indexed owner);
 event OwnershipTransferStarted(uint256 indexed assetId, address indexed from, address indexed to, uint40 expiresAt);
 event OwnershipTransferred(uint256 indexed assetId, address indexed from, address indexed to, bytes32 reason);
 event OwnershipTransferCancelled(uint256 indexed assetId, address indexed cancelledBy);
-event TransferLockChanged(uint256 indexed assetId, bool locked, address indexed by);
+event TransferLockChanged(uint256 indexed assetId, address indexed lockedBy, address indexed by);
+event TransferFrozen(uint256 indexed assetId);
 ```
 
 `OwnershipTransferred.reason` is a `bytes32` discriminator — `"DIRECT"` or

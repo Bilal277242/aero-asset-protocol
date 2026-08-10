@@ -294,22 +294,33 @@ unbounded loops.
 
 ```solidity
 struct OwnershipRecord {
-    // ── slot 0 ── 27 / 32
+    // ── slot 0 ── 26 / 32
     address owner;           // 20
     uint40  since;           //  5
-    bool    transferLocked;  //  1 — set while an escrow settlement is pending
-    uint8   __reserved;      //  1
+    bool    transferFrozen;  //  1 — mirrored from a terminal asset status
     // ── slot 1 ── 25 / 32
     address pendingOwner;    // 20 — two-step transfer target; 0 if none
-    uint40  offerExpiresAt;  //  5
+    uint40  offerExpiresAt;  //  5 — 0 means the offer does not expire
+    // ── slot 2 ── 20 / 32
+    address lockedBy;        // 20 — the escrow holding the asset; 0 when unlocked
 }
 ```
+
+There is deliberately **no `transferLocked` boolean**. The lock is exactly
+`lockedBy != address(0)`, so a flag and a holder cannot disagree — the same reasoning
+that makes verification `verifiedAt != 0` rather than a boolean plus a timestamp.
 
 Ownership transfer is **two-step** (`initiateTransfer` → `acceptTransfer`) on the
 direct path. An aircraft record cannot be pushed to an address that has not
 acknowledged it, which prevents both fat-finger loss and unsolicited-liability
 grief. The escrow settlement path is atomic instead (`settleTransfer`), because the
 buyer's acceptance is already proven by their funding of the escrow.
+
+**`transferFrozen` is a mirror, not a second source of truth.** `AssetOwnership` is
+asset-agnostic and never reads `AssetRegistry`, so the registry pushes the flag down
+in the same transaction as the terminal status change that caused it. There is no
+unfreeze: terminal statuses are absorbing (`INV-ASSET-04`), so an unfreeze path could
+never be reached and would be untestable code on a security-relevant module.
 
 ---
 

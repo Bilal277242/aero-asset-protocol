@@ -89,13 +89,18 @@ error ParentNotAircraft(uint256 parentAssetId, AssetKind kind);
 error SelfInstallation(uint256 assetId);
 
 // AssetOwnership
+error OwnershipNotFound(uint256 assetId);
+error OwnershipAlreadyInitialized(uint256 assetId);
 error NotAssetOwner(uint256 assetId, address caller, address owner);
 error NoPendingTransfer(uint256 assetId);
 error NotPendingOwner(uint256 assetId, address caller, address pendingOwner);
 error TransferToCurrentOwner(uint256 assetId);
-error AssetTransferLocked(uint256 assetId);
 error TransferOfferExpired(uint256 assetId, uint40 expiresAt);
-error SellerNoLongerOwner(uint256 assetId, address expectedSeller, address actualOwner);
+error AssetTransferLocked(uint256 assetId, address lockedBy);
+error AssetAlreadyLocked(uint256 assetId, address lockedBy);
+error NotLockHolder(uint256 assetId, address caller, address lockedBy);
+error AssetTransferFrozen(uint256 assetId);
+error UnexpectedOwner(uint256 assetId, address expectedOwner, address actualOwner);
 ```
 
 ## Provenance

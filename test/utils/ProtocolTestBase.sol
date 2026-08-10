@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {AssetRegistry} from "../../src/assets/AssetRegistry.sol";
 import {ProtocolAddressRegistry} from "../../src/core/ProtocolAddressRegistry.sol";
 import {RoleManager} from "../../src/core/RoleManager.sol";
 import {CredentialRegistry} from "../../src/identity/CredentialRegistry.sol";
 import {OrganizationRegistry} from "../../src/identity/OrganizationRegistry.sol";
+import {IAssetRegistry} from "../../src/interfaces/IAssetRegistry.sol";
 import {ICredentialRegistry} from "../../src/interfaces/ICredentialRegistry.sol";
 import {IOrganizationRegistry} from "../../src/interfaces/IOrganizationRegistry.sol";
 import {ProtocolAddressKeys} from "../../src/libraries/ProtocolAddressKeys.sol";
 import {ProtocolRoles} from "../../src/libraries/ProtocolRoles.sol";
+import {AssetOwnership} from "../../src/ownership/AssetOwnership.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
@@ -38,6 +41,14 @@ abstract contract ProtocolTestBase is BaseTest {
     CredentialRegistry internal credentialRegistry;
     /// @notice The `CredentialRegistry` implementation behind the proxy.
     address internal credentialRegistryImpl;
+    /// @notice `AssetOwnership` accessed through its proxy.
+    AssetOwnership internal assetOwnership;
+    /// @notice The `AssetOwnership` implementation behind the proxy.
+    address internal assetOwnershipImpl;
+    /// @notice `AssetRegistry` accessed through its proxy.
+    AssetRegistry internal assetRegistry;
+    /// @notice The `AssetRegistry` implementation behind the proxy.
+    address internal assetRegistryImpl;
 
     /*//////////////////////////////////////////////////////////////
                                 FIXTURES
@@ -92,9 +103,31 @@ abstract contract ProtocolTestBase is BaseTest {
             )
         );
 
+        assetOwnershipImpl = address(new AssetOwnership());
+        assetOwnership = AssetOwnership(
+            address(
+                new ERC1967Proxy(
+                    assetOwnershipImpl,
+                    abi.encodeCall(AssetOwnership.initialize, (address(roleManager), address(addressRegistry)))
+                )
+            )
+        );
+
+        assetRegistryImpl = address(new AssetRegistry());
+        assetRegistry = AssetRegistry(
+            address(
+                new ERC1967Proxy(
+                    assetRegistryImpl,
+                    abi.encodeCall(AssetRegistry.initialize, (address(roleManager), address(addressRegistry)))
+                )
+            )
+        );
+
         addressRegistry.setAddress(ProtocolAddressKeys.ROLE_MANAGER, address(roleManager));
         addressRegistry.setAddress(ProtocolAddressKeys.ORGANIZATION_REGISTRY, address(orgRegistry));
         addressRegistry.setAddress(ProtocolAddressKeys.CREDENTIAL_REGISTRY, address(credentialRegistry));
+        addressRegistry.setAddress(ProtocolAddressKeys.ASSET_OWNERSHIP, address(assetOwnership));
+        addressRegistry.setAddress(ProtocolAddressKeys.ASSET_REGISTRY, address(assetRegistry));
 
         vm.stopPrank();
 
@@ -104,6 +137,10 @@ abstract contract ProtocolTestBase is BaseTest {
         vm.label(orgRegistryImpl, "OrganizationRegistryImpl");
         vm.label(address(credentialRegistry), "CredentialRegistry");
         vm.label(credentialRegistryImpl, "CredentialRegistryImpl");
+        vm.label(address(assetOwnership), "AssetOwnership");
+        vm.label(assetOwnershipImpl, "AssetOwnershipImpl");
+        vm.label(address(assetRegistry), "AssetRegistry");
+        vm.label(assetRegistryImpl, "AssetRegistryImpl");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -161,6 +198,41 @@ abstract contract ProtocolTestBase is BaseTest {
         credentialId = credentialRegistry.issueCredential(
             0, address(0), subjectOrgId, credType, uint40(block.timestamp + 365 days), keccak256("credential-doc")
         );
+    }
+
+    /// @notice Registers an asset owned by `owner` under a verified organization.
+    /// @param orgId The registering organization. Caller must be able to act for it.
+    /// @param actor An address that may act for `orgId`.
+    /// @param owner The initial owner.
+    /// @param kind The category of asset.
+    /// @param serialHash Serial-number commitment, or 0 for none.
+    /// @return assetId The newly minted asset id.
+    function _registerAsset(
+        uint256 orgId,
+        address actor,
+        address owner,
+        IAssetRegistry.AssetKind kind,
+        bytes32 serialHash
+    ) internal returns (uint256 assetId) {
+        vm.prank(actor);
+        assetId = assetRegistry.registerAsset(orgId, owner, kind, serialHash, keccak256("asset-meta"), "ipfs://asset");
+    }
+
+    /// @notice Registers a default aircraft owned by `alice` under her verified org.
+    /// @return orgId The registering organization.
+    /// @return assetId The newly minted aircraft asset id.
+    function _defaultAircraft() internal returns (uint256 orgId, uint256 assetId) {
+        orgId = _defaultVerifiedOrg();
+        assetId = _registerAsset(orgId, alice, alice, IAssetRegistry.AssetKind.AIRCRAFT, keccak256("MSN-12345"));
+    }
+
+    /// @notice Grants `SETTLEMENT_ROLE` to an address so it can act as an escrow.
+    /// @dev Phase 7 grants this to escrow clones from `EscrowFactory`; until then the
+    ///      settlement path is exercised with a stand-in holder.
+    /// @param account The address to grant.
+    function _grantSettlementRole(address account) internal {
+        vm.prank(protocolAdmin);
+        roleManager.grantRole(ProtocolRoles.SETTLEMENT_ROLE, account);
     }
 
     /// @notice Registers a verified MRO holding a valid maintenance-authority credential.

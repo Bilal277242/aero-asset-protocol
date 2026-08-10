@@ -65,7 +65,7 @@ no upgrade to be compatible with.
 | `MaintenanceRecord` | 2 | 30 |
 | `Listing` | 3 | 31 |
 | `Offer` | 2 | 31 |
-| `OwnershipRecord` | 2 | 27 |
+| `OwnershipRecord` | 3 | 26 |
 
 Packing rules applied throughout (`asset-model.md` §0): ids are `uint64`, timestamps
 `uint40`, enums `uint8`, short human strings `bytes32`, long strings in side mappings.

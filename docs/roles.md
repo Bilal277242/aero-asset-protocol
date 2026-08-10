@@ -22,6 +22,7 @@ so a role constant can never collide with an unrelated protocol's constant if th
 | `CREDENTIAL_ISSUER_ROLE` | `keccak256("aeroasset.role.CREDENTIAL_ISSUER")` | Compliance multisig | No |
 | `ARBITRATOR_ROLE` | `keccak256("aeroasset.role.ARBITRATOR")` | Named arbitrator EOA/multisig | No |
 | `FEE_MANAGER_ROLE` | `keccak256("aeroasset.role.FEE_MANAGER")` | `ProtocolTimelock` | Yes |
+| `ASSET_MINTER_ROLE` | `keccak256("aeroasset.role.ASSET_MINTER")` | `AircraftRegistry`, `ComponentRegistry` (machine role) | n/a |
 | `SETTLEMENT_ROLE` | `keccak256("aeroasset.role.SETTLEMENT")` | Escrow clones (machine role) | n/a |
 
 ### 1.1 Role admin graph
@@ -81,16 +82,29 @@ Adjusts fee rates within compile-time hard caps and sets the treasury address. I
 **cannot** raise a fee above `MAX_FEE_BPS`, which is a `constant` — not storage — so no
 upgrade-free path exists to exceed it. Enforced by invariant `INV-FEE-01`.
 
+### `ASSET_MINTER_ROLE` (machine role)
+Authorizes `AssetRegistry.registerAssetFor`, which mints an asset id on behalf of an
+organization without the caller being that organization. Held only by
+`AircraftRegistry` and `ComponentRegistry`, which perform their own
+`requireActingFor` check on the original caller before delegating — a specialization
+registry cannot forward `msg.sender` through a call, so the trust is delegated
+explicitly rather than smuggled. `registerAssetFor` still independently re-checks that
+the organization is `VERIFIED`.
+
+Never granted to an EOA. `Verify.s.sol` asserts every holder is a known protocol
+contract.
+
 ### `SETTLEMENT_ROLE` (machine role)
 The single role held by contracts rather than humans. `EscrowFactory` grants it to each
 `Escrow` clone at deployment and revokes it when the escrow reaches a terminal state.
 It authorizes exactly one operation: `AssetOwnership.settleTransfer`.
 
 This role is the protocol's highest-value target (`threat-model.md` T-04). Mitigations:
-`EscrowFactory` is immutable; it grants only to addresses it just deployed via
+`EscrowFactory` is immutable and grants only to addresses it just deployed via
 `Clones.cloneDeterministic`, verified against the predicted address; and
-`AssetOwnership.settleTransfer` additionally requires that the asset have a matching
-`ACTIVE` listing, so a rogue holder of the role still cannot move an unlisted aircraft.
+`AssetOwnership.settleTransfer` additionally requires the caller to be the contract
+currently **holding that asset's lock** and to correctly name the current owner. A
+rogue holder of the role therefore cannot move an asset it did not itself lock.
 
 ---
 

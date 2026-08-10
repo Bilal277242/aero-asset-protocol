@@ -39,8 +39,9 @@ Legend — `ADMIN` = `PROTOCOL_ADMIN_ROLE` · `OWNER` = asset owner per `AssetOw
 | Contract · function | Authorized | Notes |
 |---|---|---|
 | `AssetRegistry.registerAsset` | `ORG` | Caller must act for a `VERIFIED` org. Never sets `verifiedAt`. |
-| `.updateAssetMetadata` | `OWNER` or registrar `ORG` | |
-| `.setAssetStatus` | `OWNER` | Transition must be legal. |
+| `.registerAssetFor` | `ASSET_MINTER_ROLE` | Held only by `AircraftRegistry`/`ComponentRegistry`, which check org membership themselves. Re-checks the org is `VERIFIED`. |
+| `.updateAssetMetadata` | `OWNER` or registrar `ORG` | Blocked once terminal. |
+| `.setAssetStatus` | `OWNER` | Transition must be legal. Terminal status freezes ownership atomically. |
 | `.verifyAsset` / `.unverifyAsset` | `ASSET_VERIFIER_ROLE` | Separate from registration. |
 | `AircraftRegistry.registerAircraft` | `ORG` | Mints via `AssetRegistry`, attaches aircraft data. |
 | `.updateAircraft` | `OWNER` | |
@@ -48,11 +49,13 @@ Legend — `ADMIN` = `PROTOCOL_ADMIN_ROLE` · `OWNER` = asset owner per `AssetOw
 | `.installComponent` / `.removeComponent` | `OWNER` of both component and parent | |
 | `.setComponentStatus` | `OWNER` | |
 | `.quarantineComponent` | `OWNER` or `ASSET_VERIFIER_ROLE` | Verifier may quarantine a suspect part unilaterally. |
-| `AssetOwnership.initiateTransfer` | `OWNER` | Blocked while `transferLocked`. |
-| `.acceptTransfer` | `pendingOwner` | |
+| `AssetOwnership.initializeOwnership` | `AssetRegistry` only | Address-registry check, not a role. |
+| `.freezeTransfers` | `AssetRegistry` only | Permanent; no unfreeze exists. |
+| `.initiateTransfer` | `OWNER` | Blocked while locked or frozen. |
+| `.acceptTransfer` | `pendingOwner` | Blocked while frozen or past the offer deadline. |
 | `.cancelTransfer` | `OWNER` or `pendingOwner` | |
-| `.settleTransfer` | `SETTLEMENT_ROLE` | **Highest-value edge.** Additionally requires a matching `ACTIVE` listing. |
-| `.setTransferLock` | `SETTLEMENT_ROLE` | Set on escrow funding, cleared on terminal. |
+| `.setTransferLock` | `SETTLEMENT_ROLE` | Taking a lock records the holder and clears any pending direct transfer. Releasing requires being that holder. |
+| `.settleTransfer` | `SETTLEMENT_ROLE` **and** current lock holder | **Highest-value edge.** See the design note below. |
 
 ## L3 — Provenance
 
@@ -106,10 +109,22 @@ economic interest in its accuracy, so mutation follows ownership rather than the
 original registrar. An organization losing its verification does not freeze assets it
 registered for third parties.
 
-**Why `settleTransfer` needs a listing check on top of `SETTLEMENT_ROLE`.** Defence in
-depth. `SETTLEMENT_ROLE` alone would let any escrow move any asset. Requiring a
-matching `ACTIVE` listing whose `seller` is still the current owner means that even a
-hypothetical rogue escrow can only complete a trade the owner actually offered.
+**Why `settleTransfer` needs more than `SETTLEMENT_ROLE`.** The role alone would let
+any escrow move any asset. Two further conditions close that:
+
+1. **The caller must hold the asset's lock.** An escrow can only settle an asset it
+   itself locked, so a rogue role-holder cannot touch an unlocked asset or one locked
+   by a different trade.
+2. **The caller must name the current owner.** `settleTransfer(assetId, from, to)`
+   reverts unless `from` is still the owner, so a trade cannot complete against an
+   asset that changed hands underneath it.
+
+An earlier draft of this document required a matching `ACTIVE` listing instead. That
+was dropped: it would force L2 to import the L4 `Marketplace` interface — a genuine
+upward dependency — while proving less. The seller's consent is already established
+two layers up (they created the listing and accepted the offer before `EscrowFactory`
+would deploy the escrow at all), and the lock-holder check is strictly narrower than
+"some active listing exists".
 
 **Why organization admin transfer is two-step.** A one-step transfer to a mistyped
 address permanently orphans an organization's entire asset portfolio. There is no

@@ -38,6 +38,13 @@ library ProtocolRoles {
     /// @notice Authorizes fee-rate and treasury changes within the hard-coded fee cap.
     bytes32 internal constant FEE_MANAGER_ROLE = keccak256("aeroasset.role.FEE_MANAGER");
 
+    /// @notice Machine role held by the specialized asset registries; authorizes
+    ///         minting an asset id on behalf of an organization.
+    /// @dev Granted only to `AircraftRegistry` and `ComponentRegistry`, which perform
+    ///      their own organization-membership check before calling. It is a
+    ///      protocol-internal trust delegation, never granted to an EOA.
+    bytes32 internal constant ASSET_MINTER_ROLE = keccak256("aeroasset.role.ASSET_MINTER");
+
     /// @notice Machine role held by live escrow clones; authorizes settlement transfers.
     /// @dev Granted by `EscrowFactory` only to a clone address it just deployed, and
     ///      revoked when that escrow reaches a terminal state. This is the protocol's

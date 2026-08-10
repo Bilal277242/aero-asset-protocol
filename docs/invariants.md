@@ -36,8 +36,10 @@ remainder were derived from the state machines and data model.
 | `INV-COMP-03` | No two `INSTALLED` components of the same `kind` share a `position` on one parent. | Sweep per parent. |
 | `INV-OWN-01` | **(roadmap)** Every existing asset has exactly one non-zero owner. | Sweep `1..assetCount`, assert `ownerOf != address(0)`. |
 | `INV-OWN-02` | `pendingOwner != 0 ⟹ pendingOwner != owner`, and a pending transfer past `offerExpiresAt` is not acceptable. | Assertion + time-warping handler. |
-| `INV-OWN-03` | **(roadmap)** Unauthorized accounts cannot transfer restricted assets: ownership changes only via `acceptTransfer` (by `pendingOwner`) or `settleTransfer` (by `SETTLEMENT_ROLE`). | Ghost log of owner changes; assert every delta has a matching authorized call. |
-| `INV-OWN-04` | `transferLocked ⟹ a live escrow references the asset`. Locks are never orphaned. | Cross-check against the factory's escrow set. |
+| `INV-OWN-03` | **(roadmap)** Unauthorized accounts cannot transfer restricted assets: ownership changes only via `acceptTransfer` (by `pendingOwner`) or `settleTransfer` (by the asset's lock holder). | Ghost log of owner changes; assert every delta has a matching authorized call. |
+| `INV-OWN-04` | `lockedBy != 0 ⟹ a live escrow references the asset`. Locks are never orphaned. | Cross-check against the factory's escrow set. |
+| `INV-OWN-05` | `lockedBy != 0 ⟹ pendingOwner == 0`. Taking a lock clears any in-flight direct transfer, so no offer can fire the moment settlement releases. | Assertion after every lock in the handler. |
+| `INV-OWN-06` | `transferFrozen` in `AssetOwnership` agrees with `isTerminal` in `AssetRegistry` for every asset. The mirror never drifts. | Cross-contract sweep over `1..assetCount`. |
 
 ## Provenance
 

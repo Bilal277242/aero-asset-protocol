@@ -245,16 +245,46 @@ Solid arrow = state-changing call. Dashed = `view` read.
    └─────────────────────────────────────────────────────────┘
 ```
 
+### 5.0 Sub-layering inside L2
+
+The asset layer is internally ordered, because `AssetRegistry` must create an
+ownership record in the same transaction it mints an asset id — a state-changing call
+to what would otherwise be a same-layer peer. Calls only ever point down this chain:
+
+```
+L2c  AircraftRegistry · ComponentRegistry   (specialization; hold ASSET_MINTER_ROLE)
+        │
+        ▼
+L2b  AssetRegistry                          (global asset-id space, status, verification)
+        │
+        ▼
+L2a  AssetOwnership                         (asset-agnostic ownership ledger)
+```
+
+`AssetOwnership` imports no asset, marketplace or escrow type at all. It cannot read
+asset status, so `AssetRegistry` pushes a single `transferFrozen` bit down to it when
+an asset reaches a terminal status. That mirror is written by exactly one authority in
+the same transaction as the change that causes it, so the two cannot drift.
+
 ### 5.1 The one upward-looking edge, and its guard
 
-`AssetOwnership.transferFrom` must be callable by `Escrow` (L4) even though
-`AssetOwnership` sits at L2. This is **not** a layer violation of the import graph —
-`AssetOwnership` does not import any L4 type. It authorizes by *role*, not by type:
-the caller must hold `SETTLEMENT_ROLE`, which `EscrowFactory` grants only to escrow
-clones it deployed, and revokes on settlement.
+`AssetOwnership.settleTransfer` must be callable by `Escrow` (L4) even though
+`AssetOwnership` sits at L2a. This is **not** a layer violation of the import graph —
+`AssetOwnership` imports no L4 type. It authorizes by *role and by lock*, never by
+type:
 
-This is the protocol's most sensitive authorization edge and is covered by dedicated
-tests in `test/integration/SettlementAuthorization.t.sol`.
+- the caller must hold `SETTLEMENT_ROLE`, which `EscrowFactory` grants only to escrow
+  clones it deployed and revokes when they reach a terminal state; **and**
+- the caller must be the contract currently holding that asset's lock; **and**
+- the caller must correctly name the current owner.
+
+Holding the role is therefore necessary but not sufficient. See `permissions.md` for
+why this replaced the originally-specified "matching `ACTIVE` listing" check, which
+would have required an upward import.
+
+This is the protocol's most sensitive authorization edge, covered by
+`test/unit/ownership/AssetOwnership.t.sol` now and by
+`test/integration/SettlementAuthorization.t.sol` once Phase 7 lands the real escrow.
 
 ---
 
