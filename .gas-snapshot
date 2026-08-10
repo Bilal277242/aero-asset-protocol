@@ -1,0 +1,4 @@
+FoundationTest:testFuzz_Toolchain_ArithmeticIsChecked(uint256) (runs: 512, μ: 7589, ~: 7579)
+FoundationTest:test_Harness_ActorsAreDistinctAndFunded() (gas: 19660)
+FoundationTest:test_Harness_WarpsToRealisticEpoch() (gas: 4068)
+FoundationTest:test_Toolchain_SupportsCancunTransientStorage() (gas: 3643)

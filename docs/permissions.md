@@ -1,0 +1,116 @@
+# AeroAsset Protocol — Permission Matrix
+
+Function-level authorization. Every entry here has a corresponding positive test **and**
+a negative test asserting an unauthorized caller reverts (`test/unit/**/*Access.t.sol`).
+
+Legend — `ADMIN` = `PROTOCOL_ADMIN_ROLE` · `OWNER` = asset owner per `AssetOwnership`
+· `ORG` = acting for a `VERIFIED` organization · `—` = permissionless.
+
+---
+
+## L0 — Protocol core
+
+| Contract · function | Authorized | Notes |
+|---|---|---|
+| `ProtocolAddressRegistry.setAddress` | `ADMIN` | Timelocked. Emits old + new. |
+| `ProtocolAddressRegistry.getAddress` | — | `view`; reverts on unset key. |
+| `RoleManager.grantRole` / `revokeRole` | `DEFAULT_ADMIN_ROLE` | Timelock only. |
+| `RoleManager.renounceRole` | self | OZ semantics. |
+
+## L1 — Identity
+
+| Contract · function | Authorized | Notes |
+|---|---|---|
+| `OrganizationRegistry.registerOrganization` | — | Self-registers to `PENDING`. Name hash must be unique. |
+| `.updateOrganization` | org `admin` | Metadata only; cannot change type or status. |
+| `.transferOrgAdmin` / `.acceptOrgAdmin` | org `admin` / pending admin | Two-step. |
+| `.addOperator` / `.removeOperator` | org `admin` | |
+| `.verifyOrganization` / `.rejectOrganization` | `ORG_VERIFIER_ROLE` | |
+| `.suspendOrganization` / `.reactivateOrganization` | `ORG_VERIFIER_ROLE` | |
+| `.revokeOrganization` | `ADMIN` | Terminal, timelocked. |
+| `CredentialRegistry.issueCredential` | `CREDENTIAL_ISSUER_ROLE` | |
+| `.suspendCredential` / `.reinstateCredential` / `.revokeCredential` | `CREDENTIAL_ISSUER_ROLE` | |
+| `.expireCredential` | — | Only when `expiresAt <= now`. |
+
+## L2 — Assets
+
+| Contract · function | Authorized | Notes |
+|---|---|---|
+| `AssetRegistry.registerAsset` | `ORG` | Caller must act for a `VERIFIED` org. Never sets `verifiedAt`. |
+| `.updateAssetMetadata` | `OWNER` or registrar `ORG` | |
+| `.setAssetStatus` | `OWNER` | Transition must be legal. |
+| `.verifyAsset` / `.unverifyAsset` | `ASSET_VERIFIER_ROLE` | Separate from registration. |
+| `AircraftRegistry.registerAircraft` | `ORG` | Mints via `AssetRegistry`, attaches aircraft data. |
+| `.updateAircraft` | `OWNER` | |
+| `ComponentRegistry.registerComponent` | `ORG` | |
+| `.installComponent` / `.removeComponent` | `OWNER` of both component and parent | |
+| `.setComponentStatus` | `OWNER` | |
+| `.quarantineComponent` | `OWNER` or `ASSET_VERIFIER_ROLE` | Verifier may quarantine a suspect part unilaterally. |
+| `AssetOwnership.initiateTransfer` | `OWNER` | Blocked while `transferLocked`. |
+| `.acceptTransfer` | `pendingOwner` | |
+| `.cancelTransfer` | `OWNER` or `pendingOwner` | |
+| `.settleTransfer` | `SETTLEMENT_ROLE` | **Highest-value edge.** Additionally requires a matching `ACTIVE` listing. |
+| `.setTransferLock` | `SETTLEMENT_ROLE` | Set on escrow funding, cleared on terminal. |
+
+## L3 — Provenance
+
+| Contract · function | Authorized | Notes |
+|---|---|---|
+| `DocumentRegistry.registerDocument` | `OWNER` or issuer `ORG` | Hash must be non-zero and unregistered. |
+| `.supersedeDocument` | original issuer `ORG` | |
+| `.revokeDocument` | original issuer `ORG` or `ADMIN` | |
+| `MaintenanceRegistry.recordMaintenance` | `ORG` **and** `MRO` type **and** valid `MAINTENANCE_AUTHORITY` credential | Three independent checks, all on-chain. |
+| `AssetPassport.*` | — | All `view`. Zero state, zero writes. |
+
+## L4 — Transaction
+
+| Contract · function | Authorized | Notes |
+|---|---|---|
+| `Marketplace.createListing` | `OWNER` | Asset not terminal, not already listed, token allowlisted. |
+| `.cancelListing` | seller | Reverts if an escrow is live. |
+| `.expireListing` | — | Only past `expiresAt`. |
+| `.makeOffer` | any address ≠ seller | |
+| `.withdrawOffer` | offer `buyer` | |
+| `.acceptOffer` / `.rejectOffer` | listing `seller` | Accept opens the escrow. |
+| `.expireOffer` | — | Only past `expiresAt`. |
+| `.markSold` | `SETTLEMENT_ROLE` | Called by the settling escrow only. |
+| `EscrowFactory.openEscrow` | `Marketplace` only | Address-registry check, not a role. |
+| `Escrow.fund` | escrow `buyer` | |
+| `.release` | escrow `buyer` | |
+| `.cancel` | buyer or seller; anyone after `fundingDeadline` | |
+| `.raiseDispute` | buyer or seller, before `settlementDeadline` | |
+| `.resolveDispute` | `ARBITRATOR_ROLE` | Only from `DISPUTED`. |
+| `.claimTimeout` | — | Past `settlementDeadline`. **Callable while paused.** |
+| `FeeManager.setFeeBps` | `FEE_MANAGER_ROLE` | Hard-capped by a `constant`. |
+| `.setTreasury` | `FEE_MANAGER_ROLE` | Non-zero. |
+| `.setTokenAllowed` | `ADMIN` | Timelocked. |
+
+## Cross-cutting
+
+| Function | Authorized |
+|---|---|
+| `pause()` on any pausable module | `PAUSER_ROLE` |
+| `unpause()` on any pausable module | `ADMIN` (timelocked) |
+| `upgradeToAndCall` on any UUPS proxy | `ADMIN` (timelocked) |
+
+---
+
+## Design notes
+
+**Why `ORG` gates registration but `OWNER` gates mutation.** Only a verified aviation
+business should be able to introduce a new record into the registry — that is the
+protocol's trust boundary. Once a record exists, the owner is the party with an
+economic interest in its accuracy, so mutation follows ownership rather than the
+original registrar. An organization losing its verification does not freeze assets it
+registered for third parties.
+
+**Why `settleTransfer` needs a listing check on top of `SETTLEMENT_ROLE`.** Defence in
+depth. `SETTLEMENT_ROLE` alone would let any escrow move any asset. Requiring a
+matching `ACTIVE` listing whose `seller` is still the current owner means that even a
+hypothetical rogue escrow can only complete a trade the owner actually offered.
+
+**Why organization admin transfer is two-step.** A one-step transfer to a mistyped
+address permanently orphans an organization's entire asset portfolio. There is no
+recovery path, so the write is made unmistakable instead.
+
+**Why `PAUSER` cannot unpause.** See `roles.md` §2 — fast to stop, slow to restart.

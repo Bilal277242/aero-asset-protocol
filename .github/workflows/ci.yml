@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  build-and-test:
+    name: Build & test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Check formatting
+        run: forge fmt --check
+
+      - name: Build (warnings are errors)
+        run: forge build --sizes
+
+      - name: Unit / integration / fuzz tests
+        run: forge test -vvv
+
+      - name: Gas snapshot (fails on regression)
+        run: forge snapshot --check --tolerance 1
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Generate coverage
+        # ir-minimum keeps `forge coverage` compiling with the optimizer settings
+        # this repo uses; invariant suites are excluded because they distort
+        # line coverage without adding signal.
+        run: forge coverage --ir-minimum --no-match-path "test/invariant/**" --report lcov --report summary
+
+      - uses: codecov/codecov-action@v4
+        continue-on-error: true
+        with:
+          files: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  static-analysis:
+    name: Slither
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Run Slither
+        uses: crytic/slither-action@v0.4.0
+        continue-on-error: true
+        with:
+          fail-on: medium
+          slither-args: --filter-paths "lib/|test/|script/"

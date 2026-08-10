@@ -1,0 +1,106 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+test = "test"
+script = "script"
+cache_path = "cache"
+
+# Pinned compiler. The protocol targets 0.8.28+ per the architecture spec; pinning
+# an exact version keeps bytecode reproducible across WSL, CI and verification.
+solc_version = "0.8.28"
+evm_version = "cancun"
+
+optimizer = true
+# 200 runs balances deployment cost (many independent registries + per-listing
+# Escrow clones) against per-call cost. Revisit in Phase 8 with real gas data.
+optimizer_runs = 200
+
+# Required for the UUPS registries: `forge inspect <C> storageLayout` and the
+# storage-compatibility tests in test/upgrade depend on this output.
+extra_output = ["storageLayout"]
+
+# No test or script in this protocol shells out. Keeping this false removes an
+# entire class of malicious-dependency risk.
+ffi = false
+# Surface every solc warning; CI promotes them to errors (see profile.ci).
+ignored_warnings_from = ["lib"]
+
+fs_permissions = [
+    { access = "read", path = "./out" },
+    { access = "read", path = "./deployments" },
+    { access = "read-write", path = "./deployments" },
+]
+
+[profile.default.fuzz]
+runs = 512
+max_test_rejects = 100_000
+
+[profile.default.invariant]
+runs = 128
+depth = 64
+fail_on_revert = false
+call_override = false
+shrink_run_limit = 5_000
+
+# CI profile: deeper randomized testing, warnings are hard failures.
+[profile.ci]
+deny = "warnings"
+verbosity = 3
+
+[profile.ci.fuzz]
+runs = 5_000
+max_test_rejects = 500_000
+
+[profile.ci.invariant]
+runs = 512
+depth = 128
+fail_on_revert = false
+
+# Fast local loop while iterating on a single contract.
+[profile.lite]
+optimizer = false
+
+[profile.lite.fuzz]
+runs = 32
+
+[profile.lite.invariant]
+runs = 8
+depth = 16
+
+# via-IR build used for the pre-audit gas baseline and for mainnet artifacts.
+# Kept out of the default profile because it roughly 5-10x's compile time.
+[profile.optimized]
+via_ir = true
+optimizer_runs = 1_000_000
+bytecode_hash = "none"
+cbor_metadata = false
+
+[fmt]
+line_length = 120
+tab_width = 4
+bracket_spacing = false
+int_types = "long"
+multiline_func_header = "attributes_first"
+quote_style = "double"
+number_underscore = "thousands"
+single_line_statement_blocks = "multi"
+override_spacing = false
+wrap_comments = true
+sort_imports = true
+
+[doc]
+out = "docs/reference"
+title = "AeroAsset Protocol"
+
+[rpc_endpoints]
+sepolia = "${SEPOLIA_RPC_URL}"
+mainnet = "${MAINNET_RPC_URL}"
+base_sepolia = "${BASE_SEPOLIA_RPC_URL}"
+base = "${BASE_RPC_URL}"
+
+[etherscan]
+sepolia = { key = "${ETHERSCAN_API_KEY}", chain = 11155111 }
+mainnet = { key = "${ETHERSCAN_API_KEY}", chain = 1 }
+base_sepolia = { key = "${BASESCAN_API_KEY}", chain = 84532 }
+base = { key = "${BASESCAN_API_KEY}", chain = 8453 }
