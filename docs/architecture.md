@@ -91,7 +91,7 @@ knows escrow exists. `AssetRegistry` never imports a marketplace type.
 | `MaintenanceRegistry` | L3 | **UUPS** | No | Yes |
 | `AssetPassport` | L3 | No (immutable) | No | **No — zero state** |
 | `Marketplace` | L4 | **UUPS** | No | Yes |
-| `FeeManager` | L4 | No (immutable) | Transiently | Yes |
+| `FeeManager` | L4 | No (immutable) | **No — never** | Yes |
 | `EscrowFactory` | L4 | No (immutable) | No | Yes |
 | `Escrow` (clone) | L4 | No (immutable) | **Yes** | Yes |
 

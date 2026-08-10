@@ -135,11 +135,13 @@ event EscrowStatusChanged(uint256 indexed escrowId, EscrowStatus indexed oldStat
 event EscrowSettled(
     uint256 indexed escrowId, address indexed seller, uint256 sellerProceeds, uint256 feeAmount
 );
+// Emitted by Escrow, not FeeManager: the fee manager never touches tokens, so it
+// cannot observe a collection. The escrow knows token, treasury, amount and type.
+event FeeCollected(address indexed token, address indexed treasury, uint256 amount, bytes32 indexed feeType);
 event EscrowRefunded(uint256 indexed escrowId, address indexed buyer, uint256 amount);
 event DisputeRaised(uint256 indexed escrowId, address indexed raisedBy);
 event DisputeResolved(uint256 indexed escrowId, address indexed arbitrator, bool releasedToSeller);
 
-event FeeCollected(address indexed token, address indexed treasury, uint256 amount, bytes32 indexed feeType);
 event FeeBpsChanged(bytes32 indexed feeType, uint16 oldBps, uint16 newBps);
 event TreasuryChanged(address indexed oldTreasury, address indexed newTreasury);
 event TokenAllowanceChanged(address indexed token, bool allowed);

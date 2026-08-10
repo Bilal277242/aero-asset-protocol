@@ -449,9 +449,17 @@ is no longer settleable: settlement re-checks that `AssetOwnership.ownerOf(asset
 still equals `listing.seller` and reverts otherwise (`INV-MKT-04`). This closes the
 "sell it twice" race without needing to hunt down and cancel listings on transfer.
 
-`EXPIRED` is a *derived* state for reads and a *recordable* state for writes: a listing
-past `expiresAt` reports `EXPIRED` from `getListing`, and anyone may call
-`expireListing` to persist it. No fund movement depends on the persisted flag.
+**Effective status is computed, never stored** — the same rule as credentials. A
+listing past `expiresAt` still reads `ACTIVE` from `getListing` until someone pays to
+record the expiry, so consumers must call `isListingActive`, which checks status *and*
+elapsed time. `expireListing` is permissionless and merely persists what time has
+already decided; no fund movement depends on it having been called.
+
+> The Phase 0 draft said `getListing` would itself report `EXPIRED`. That was changed
+> during implementation for consistency: every other lifecycle in the protocol returns
+> raw storage from its getter and exposes a separate computed predicate, and one
+> accessor behaving differently is exactly how a consumer ends up trusting the wrong
+> one. The same applies to `getOffer` / `isOfferActive`.
 
 ### 4.2 `Offer` — 2 slots
 

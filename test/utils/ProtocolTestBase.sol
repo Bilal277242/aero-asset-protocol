@@ -7,6 +7,7 @@ import {ComponentRegistry} from "../../src/assets/ComponentRegistry.sol";
 import {ProtocolAddressRegistry} from "../../src/core/ProtocolAddressRegistry.sol";
 import {RoleManager} from "../../src/core/RoleManager.sol";
 import {DocumentRegistry} from "../../src/documents/DocumentRegistry.sol";
+import {FeeManager} from "../../src/fees/FeeManager.sol";
 import {CredentialRegistry} from "../../src/identity/CredentialRegistry.sol";
 import {OrganizationRegistry} from "../../src/identity/OrganizationRegistry.sol";
 import {IAircraftRegistry} from "../../src/interfaces/IAircraftRegistry.sol";
@@ -17,11 +18,15 @@ import {IDocumentRegistry} from "../../src/interfaces/IDocumentRegistry.sol";
 import {IMaintenanceRegistry} from "../../src/interfaces/IMaintenanceRegistry.sol";
 import {IOrganizationRegistry} from "../../src/interfaces/IOrganizationRegistry.sol";
 import {ProtocolAddressKeys} from "../../src/libraries/ProtocolAddressKeys.sol";
+import {ProtocolFeeTypes} from "../../src/libraries/ProtocolFeeTypes.sol";
 import {ProtocolRoles} from "../../src/libraries/ProtocolRoles.sol";
 import {MaintenanceRegistry} from "../../src/maintenance/MaintenanceRegistry.sol";
+import {Marketplace} from "../../src/marketplace/Marketplace.sol";
 import {AssetOwnership} from "../../src/ownership/AssetOwnership.sol";
 import {AssetPassport} from "../../src/passport/AssetPassport.sol";
 import {BaseTest} from "./BaseTest.sol";
+import {MockERC20} from "./mocks/MockERC20.sol";
+import {MockEscrowFactory} from "./mocks/MockEscrowFactory.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /// @title ProtocolTestBase
@@ -76,6 +81,19 @@ abstract contract ProtocolTestBase is BaseTest {
     address internal maintenanceRegistryImpl;
     /// @notice `AssetPassport`, deployed directly since it holds no state.
     AssetPassport internal assetPassport;
+    /// @notice `FeeManager`, deployed directly since it is immutable.
+    FeeManager internal feeManager;
+    /// @notice `Marketplace` accessed through its proxy.
+    Marketplace internal marketplace;
+    /// @notice The `Marketplace` implementation behind the proxy.
+    address internal marketplaceImpl;
+    /// @notice Stand-in escrow factory. Phase 7 replaces it with the real one.
+    MockEscrowFactory internal escrowFactory;
+    /// @notice Allowlisted settlement token.
+    MockERC20 internal settlementToken;
+
+    /// @notice Marketplace fee rate used by the fixture: 2%.
+    uint16 internal constant FIXTURE_FEE_BPS = 200;
 
     /*//////////////////////////////////////////////////////////////
                                 FIXTURES
@@ -194,6 +212,24 @@ abstract contract ProtocolTestBase is BaseTest {
         // address-registry write.
         assetPassport = new AssetPassport(address(addressRegistry));
 
+        settlementToken = new MockERC20("Mock USD Coin", "mUSDC");
+        feeManager = new FeeManager(address(roleManager), treasury);
+
+        marketplaceImpl = address(new Marketplace());
+        marketplace = Marketplace(
+            address(
+                new ERC1967Proxy(
+                    marketplaceImpl,
+                    abi.encodeCall(Marketplace.initialize, (address(roleManager), address(addressRegistry)))
+                )
+            )
+        );
+        escrowFactory = new MockEscrowFactory(address(marketplace));
+
+        roleManager.grantRole(ProtocolRoles.FEE_MANAGER_ROLE, protocolAdmin);
+        feeManager.setTokenAllowed(address(settlementToken), true);
+        feeManager.setFeeBps(ProtocolFeeTypes.MARKETPLACE, FIXTURE_FEE_BPS);
+
         // The specialization registries mint asset ids on behalf of organizations
         // after checking membership themselves. Never granted to an EOA.
         roleManager.grantRole(ProtocolRoles.ASSET_MINTER_ROLE, address(aircraftRegistry));
@@ -209,6 +245,9 @@ abstract contract ProtocolTestBase is BaseTest {
         addressRegistry.setAddress(ProtocolAddressKeys.DOCUMENT_REGISTRY, address(documentRegistry));
         addressRegistry.setAddress(ProtocolAddressKeys.MAINTENANCE_REGISTRY, address(maintenanceRegistry));
         addressRegistry.setAddress(ProtocolAddressKeys.ASSET_PASSPORT, address(assetPassport));
+        addressRegistry.setAddress(ProtocolAddressKeys.FEE_MANAGER, address(feeManager));
+        addressRegistry.setAddress(ProtocolAddressKeys.MARKETPLACE, address(marketplace));
+        addressRegistry.setAddress(ProtocolAddressKeys.ESCROW_FACTORY, address(escrowFactory));
 
         vm.stopPrank();
 
@@ -231,6 +270,11 @@ abstract contract ProtocolTestBase is BaseTest {
         vm.label(address(maintenanceRegistry), "MaintenanceRegistry");
         vm.label(maintenanceRegistryImpl, "MaintenanceRegistryImpl");
         vm.label(address(assetPassport), "AssetPassport");
+        vm.label(address(feeManager), "FeeManager");
+        vm.label(address(marketplace), "Marketplace");
+        vm.label(marketplaceImpl, "MarketplaceImpl");
+        vm.label(address(escrowFactory), "MockEscrowFactory");
+        vm.label(address(settlementToken), "SettlementToken");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -412,6 +456,22 @@ abstract contract ProtocolTestBase is BaseTest {
             documentId,
             keccak256("work-package")
         );
+    }
+
+    /// @notice Registers, verifies and lists an aircraft owned by `alice`.
+    /// @param price Gross asking price in settlement-token base units.
+    /// @return orgId The registering organization.
+    /// @return assetId The aircraft asset id.
+    /// @return listingId The active listing id.
+    function _listedAircraft(uint128 price) internal returns (uint256 orgId, uint256 assetId, uint256 listingId) {
+        (orgId, assetId) = _defaultAircraft();
+
+        vm.prank(orgVerifier);
+        assetRegistry.verifyAsset(assetId, orgId);
+
+        vm.prank(alice);
+        listingId =
+            marketplace.createListing(assetId, address(settlementToken), price, uint40(block.timestamp + 30 days));
     }
 
     /// @notice Grants `SETTLEMENT_ROLE` to an address so it can act as an escrow.

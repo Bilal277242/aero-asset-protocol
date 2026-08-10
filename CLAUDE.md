@@ -97,7 +97,7 @@ valuation, DeFi yield, decentralized arbitration, on-chain document storage.
 | 3 | `AssetRegistry`, `AssetOwnership` | ✅ complete |
 | 4 | `AircraftRegistry`, `ComponentRegistry` | ✅ complete |
 | 5 | `DocumentRegistry`, `MaintenanceRegistry`, `AssetPassport` | ✅ complete |
-| 6 | `FeeManager`, `Marketplace` | ⬜ |
+| 6 | `FeeManager`, `Marketplace` | ✅ complete |
 | 7 | `EscrowFactory`, `Escrow`, disputes | ⬜ |
 | 8 | Invariants, fuzz, static analysis, gas | ⬜ |
 | 9 | Deployment scripts, Sepolia, E2E | ⬜ |

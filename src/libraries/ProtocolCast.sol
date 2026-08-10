@@ -30,6 +30,21 @@ library ProtocolCast {
         return uint64(value);
     }
 
+    /// @notice Narrows a `uint256` to `uint128`, reverting on overflow.
+    /// @dev Used for prices and fee amounts. `uint128` holds 3.4 × 10³⁸ base units —
+    ///      far beyond any settlement token's total supply — while letting a price and
+    ///      an identifier share a storage slot.
+    /// @param value The value to narrow.
+    /// @return The value as a `uint128`.
+    function toUint128(uint256 value) internal pure returns (uint128) {
+        if (value > type(uint128).max) {
+            revert ValueTooLarge(value, type(uint128).max);
+        }
+        // Safe: the guard above rejects every value that would truncate.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return uint128(value);
+    }
+
     /// @notice Narrows a `uint256` to `uint40`, reverting on overflow.
     /// @param value The value to narrow.
     /// @return The value as a `uint40`.
