@@ -61,11 +61,11 @@ Legend — `ADMIN` = `PROTOCOL_ADMIN_ROLE` · `OWNER` = asset owner per `AssetOw
 
 | Contract · function | Authorized | Notes |
 |---|---|---|
-| `DocumentRegistry.registerDocument` | `OWNER` or issuer `ORG` | Hash must be non-zero and unregistered. |
-| `.supersedeDocument` | original issuer `ORG` | |
-| `.revokeDocument` | original issuer `ORG` or `ADMIN` | |
-| `MaintenanceRegistry.recordMaintenance` | `ORG` **and** `MRO` type **and** valid `MAINTENANCE_AUTHORITY` credential | Three independent checks, all on-chain. |
-| `AssetPassport.*` | — | All `view`. Zero state, zero writes. |
+| `DocumentRegistry.registerDocument` | `OWNER` (with `issuerOrgId == 0`) **or** acting for `issuerOrgId` | Hash non-zero and unregistered; `issuedAt` not in the future; asset non-terminal. **A caller can never attribute a document to an organization it does not act for.** |
+| `.supersedeDocument` | document controller | Both documents `ACTIVE` and describing the same asset. |
+| `.revokeDocument` | document controller or `ADMIN` | Terminal. Callable while paused. |
+| `MaintenanceRegistry.recordMaintenance` | `ORG` **and** `MRO` type **and** valid `MAINTENANCE_AUTHORITY` credential | Three independent checks, all on-chain. A cited document must be `ACTIVE` and describe the same asset. |
+| `AssetPassport.*` | — | All `view`. Zero state, zero writes, not upgradeable. |
 
 ## L4 — Transaction
 

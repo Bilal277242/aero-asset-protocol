@@ -6,16 +6,21 @@ import {AssetRegistry} from "../../src/assets/AssetRegistry.sol";
 import {ComponentRegistry} from "../../src/assets/ComponentRegistry.sol";
 import {ProtocolAddressRegistry} from "../../src/core/ProtocolAddressRegistry.sol";
 import {RoleManager} from "../../src/core/RoleManager.sol";
+import {DocumentRegistry} from "../../src/documents/DocumentRegistry.sol";
 import {CredentialRegistry} from "../../src/identity/CredentialRegistry.sol";
 import {OrganizationRegistry} from "../../src/identity/OrganizationRegistry.sol";
 import {IAircraftRegistry} from "../../src/interfaces/IAircraftRegistry.sol";
 import {IAssetRegistry} from "../../src/interfaces/IAssetRegistry.sol";
 import {IComponentRegistry} from "../../src/interfaces/IComponentRegistry.sol";
 import {ICredentialRegistry} from "../../src/interfaces/ICredentialRegistry.sol";
+import {IDocumentRegistry} from "../../src/interfaces/IDocumentRegistry.sol";
+import {IMaintenanceRegistry} from "../../src/interfaces/IMaintenanceRegistry.sol";
 import {IOrganizationRegistry} from "../../src/interfaces/IOrganizationRegistry.sol";
 import {ProtocolAddressKeys} from "../../src/libraries/ProtocolAddressKeys.sol";
 import {ProtocolRoles} from "../../src/libraries/ProtocolRoles.sol";
+import {MaintenanceRegistry} from "../../src/maintenance/MaintenanceRegistry.sol";
 import {AssetOwnership} from "../../src/ownership/AssetOwnership.sol";
+import {AssetPassport} from "../../src/passport/AssetPassport.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
@@ -61,6 +66,16 @@ abstract contract ProtocolTestBase is BaseTest {
     ComponentRegistry internal componentRegistry;
     /// @notice The `ComponentRegistry` implementation behind the proxy.
     address internal componentRegistryImpl;
+    /// @notice `DocumentRegistry` accessed through its proxy.
+    DocumentRegistry internal documentRegistry;
+    /// @notice The `DocumentRegistry` implementation behind the proxy.
+    address internal documentRegistryImpl;
+    /// @notice `MaintenanceRegistry` accessed through its proxy.
+    MaintenanceRegistry internal maintenanceRegistry;
+    /// @notice The `MaintenanceRegistry` implementation behind the proxy.
+    address internal maintenanceRegistryImpl;
+    /// @notice `AssetPassport`, deployed directly since it holds no state.
+    AssetPassport internal assetPassport;
 
     /*//////////////////////////////////////////////////////////////
                                 FIXTURES
@@ -155,6 +170,30 @@ abstract contract ProtocolTestBase is BaseTest {
             )
         );
 
+        documentRegistryImpl = address(new DocumentRegistry());
+        documentRegistry = DocumentRegistry(
+            address(
+                new ERC1967Proxy(
+                    documentRegistryImpl,
+                    abi.encodeCall(DocumentRegistry.initialize, (address(roleManager), address(addressRegistry)))
+                )
+            )
+        );
+
+        maintenanceRegistryImpl = address(new MaintenanceRegistry());
+        maintenanceRegistry = MaintenanceRegistry(
+            address(
+                new ERC1967Proxy(
+                    maintenanceRegistryImpl,
+                    abi.encodeCall(MaintenanceRegistry.initialize, (address(roleManager), address(addressRegistry)))
+                )
+            )
+        );
+
+        // Zero state, so no proxy: a new version is a fresh deployment plus one
+        // address-registry write.
+        assetPassport = new AssetPassport(address(addressRegistry));
+
         // The specialization registries mint asset ids on behalf of organizations
         // after checking membership themselves. Never granted to an EOA.
         roleManager.grantRole(ProtocolRoles.ASSET_MINTER_ROLE, address(aircraftRegistry));
@@ -167,6 +206,9 @@ abstract contract ProtocolTestBase is BaseTest {
         addressRegistry.setAddress(ProtocolAddressKeys.ASSET_REGISTRY, address(assetRegistry));
         addressRegistry.setAddress(ProtocolAddressKeys.AIRCRAFT_REGISTRY, address(aircraftRegistry));
         addressRegistry.setAddress(ProtocolAddressKeys.COMPONENT_REGISTRY, address(componentRegistry));
+        addressRegistry.setAddress(ProtocolAddressKeys.DOCUMENT_REGISTRY, address(documentRegistry));
+        addressRegistry.setAddress(ProtocolAddressKeys.MAINTENANCE_REGISTRY, address(maintenanceRegistry));
+        addressRegistry.setAddress(ProtocolAddressKeys.ASSET_PASSPORT, address(assetPassport));
 
         vm.stopPrank();
 
@@ -184,6 +226,11 @@ abstract contract ProtocolTestBase is BaseTest {
         vm.label(aircraftRegistryImpl, "AircraftRegistryImpl");
         vm.label(address(componentRegistry), "ComponentRegistry");
         vm.label(componentRegistryImpl, "ComponentRegistryImpl");
+        vm.label(address(documentRegistry), "DocumentRegistry");
+        vm.label(documentRegistryImpl, "DocumentRegistryImpl");
+        vm.label(address(maintenanceRegistry), "MaintenanceRegistry");
+        vm.label(maintenanceRegistryImpl, "MaintenanceRegistryImpl");
+        vm.label(address(assetPassport), "AssetPassport");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -262,11 +309,14 @@ abstract contract ProtocolTestBase is BaseTest {
     }
 
     /// @notice Registers a default aircraft owned by `alice` under her verified org.
+    /// @dev Goes through `AircraftRegistry`, so the fixture is a real aircraft in both
+    ///      the generic and the specialization registry — not a bare asset that merely
+    ///      claims kind `AIRCRAFT`.
     /// @return orgId The registering organization.
     /// @return assetId The newly minted aircraft asset id.
     function _defaultAircraft() internal returns (uint256 orgId, uint256 assetId) {
         orgId = _defaultVerifiedOrg();
-        assetId = _registerAsset(orgId, alice, alice, IAssetRegistry.AssetKind.AIRCRAFT, keccak256("MSN-12345"));
+        assetId = _registerAircraft(orgId, alice, alice, keccak256("MSN-12345"));
     }
 
     /// @notice Registers an aircraft through `AircraftRegistry`.
@@ -324,6 +374,44 @@ abstract contract ProtocolTestBase is BaseTest {
 
         vm.prank(actor);
         assetId = componentRegistry.registerComponent(params);
+    }
+
+    /// @notice Registers a document against an asset, attributed to the owner.
+    /// @param assetId The asset the document describes.
+    /// @param owner The asset owner registering it.
+    /// @param docType The category of document.
+    /// @param documentHash Commitment to the document bytes.
+    /// @return documentId The newly minted document id.
+    function _registerDocument(
+        uint256 assetId,
+        address owner,
+        IDocumentRegistry.DocumentType docType,
+        bytes32 documentHash
+    ) internal returns (uint256 documentId) {
+        vm.prank(owner);
+        documentId =
+            documentRegistry.registerDocument(assetId, 0, docType, documentHash, uint40(block.timestamp), "ipfs://doc");
+    }
+
+    /// @notice Records a maintenance event through the three-way authorization gate.
+    /// @param assetId The asset worked on.
+    /// @param mroOrgId The credentialed MRO organization.
+    /// @param actor An address acting for `mroOrgId`.
+    /// @param documentId Supporting document, or 0.
+    /// @return recordId The newly minted record id.
+    function _recordMaintenance(uint256 assetId, uint256 mroOrgId, address actor, uint256 documentId)
+        internal
+        returns (uint256 recordId)
+    {
+        vm.prank(actor);
+        recordId = maintenanceRegistry.recordMaintenance(
+            assetId,
+            mroOrgId,
+            IMaintenanceRegistry.MaintenanceType.C_CHECK,
+            uint40(block.timestamp),
+            documentId,
+            keccak256("work-package")
+        );
     }
 
     /// @notice Grants `SETTLEMENT_ROLE` to an address so it can act as an escrow.

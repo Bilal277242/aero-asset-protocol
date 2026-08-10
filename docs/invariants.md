@@ -50,6 +50,8 @@ remainder were derived from the state machines and data model.
 | `INV-DOC-03` | `status == SUPERSEDED ⟺ supersededById != 0`, and the superseding document exists and points at the same asset. | Assertion. |
 | `INV-MNT-01` | Maintenance records are immutable and append-only; count is monotonically non-decreasing. | Snapshot comparison. |
 | `INV-MNT-02` | Every record's `performedByOrgId` was an `MRO`-type, `VERIFIED` org holding a valid `MAINTENANCE_AUTHORITY` credential *at write time*. | Handler asserts at call time (later revocation does not retro-invalidate — see `state-machines.md` §1). |
+| `INV-MNT-04` | Every record's `documentId` is either 0 or refers to a document describing the **same** asset. Evidence cannot be laundered between aircraft. | Sweep all records; cross-check `DocumentRegistry`. |
+| `INV-PASS-01` | `AssetPassport` holds no storage: every slot reads zero after any call sequence. | `vm.load` sweep after a populated fixture; asserted in `test/unit/passport/AssetPassport.t.sol`. |
 | `INV-MNT-03` | `performedAt <= block.timestamp` for every record. No future-dated maintenance. | Sweep. |
 
 ## Marketplace

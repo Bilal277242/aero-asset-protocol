@@ -4,10 +4,10 @@ Blockchain infrastructure for aviation assets — a verified asset registry, dig
 asset passport, maintenance and document proofs, ownership tracking, marketplace and
 escrow.
 
-> **Status: Phase 4 complete** — the protocol core (L0), the identity layer (L1) and
-> the full asset layer (`AssetRegistry`, `AssetOwnership`, `AircraftRegistry`,
-> `ComponentRegistry`) are implemented and tested. Provenance (L3) and the transaction
-> layer (L4) are not built yet. This is not audited software and must not be used with
+> **Status: Phase 5 complete** — the protocol core (L0), identity (L1), the full
+> asset layer (L2) and the provenance layer (`DocumentRegistry`,
+> `MaintenanceRegistry`, `AssetPassport`) are implemented and tested. The transaction
+> layer (L4) is not built yet. This is not audited software and must not be used with
 > real funds.
 
 ---
@@ -118,7 +118,7 @@ Deployment (Phase 9) uses staged scripts; copy `.env.example` to `.env` first.
 | 2 | `CredentialRegistry` | ✅ |
 | 3 | `AssetRegistry` + `AssetOwnership` | ✅ |
 | 4 | `AircraftRegistry` + `ComponentRegistry` | ✅ |
-| 5 | Provenance + `AssetPassport` | ⬜ |
+| 5 | Provenance + `AssetPassport` | ✅ |
 | 6 | `FeeManager` + `Marketplace` | ⬜ |
 | 7 | Escrow + disputes | ⬜ |
 | 8 | Invariants, fuzz, static analysis, gas | ⬜ |
