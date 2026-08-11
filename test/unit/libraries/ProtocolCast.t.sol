@@ -44,6 +44,43 @@ contract ProtocolCastTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
+                                UINT128
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Values inside the range pass through unchanged.
+    function test_ToUint128_PassesThroughInRange() public pure {
+        assertEq(ProtocolCast.toUint128(0), 0, "zero");
+        assertEq(ProtocolCast.toUint128(type(uint128).max), type(uint128).max, "boundary");
+    }
+
+    /// @notice One past the boundary reverts rather than wrapping.
+    /// @dev Guards prices and fee amounts. A truncated price would settle a trade at a
+    ///      fraction of what the parties agreed.
+    function test_RevertWhen_ToUint128Overflows() public {
+        uint256 overflow = uint256(type(uint128).max) + 1;
+
+        vm.expectRevert(abi.encodeWithSelector(ValueTooLarge.selector, overflow, uint256(type(uint128).max)));
+        this.callToUint128(overflow);
+    }
+
+    /// @notice Every in-range value round-trips; every out-of-range value reverts.
+    function testFuzz_ToUint128(uint256 value) public {
+        if (value <= type(uint128).max) {
+            assertEq(uint256(ProtocolCast.toUint128(value)), value, "round-trip failed");
+        } else {
+            vm.expectRevert(abi.encodeWithSelector(ValueTooLarge.selector, value, uint256(type(uint128).max)));
+            this.callToUint128(value);
+        }
+    }
+
+    /// @notice External wrapper so `vm.expectRevert` observes a call boundary.
+    /// @param value The value to narrow.
+    /// @return The narrowed value.
+    function callToUint128(uint256 value) external pure returns (uint128) {
+        return ProtocolCast.toUint128(value);
+    }
+
+    /*//////////////////////////////////////////////////////////////
                                  UINT40
     //////////////////////////////////////////////////////////////*/
 

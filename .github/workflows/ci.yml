@@ -54,8 +54,13 @@ jobs:
         # lossy: it reported ~14 executed lines as uncovered, including whole
         # function bodies that tests demonstrably reach. Add it back only if this
         # build starts hitting "stack too deep", and re-verify the numbers if so.
-        # Invariant suites are excluded: they distort line coverage without signal.
-        run: forge coverage --no-match-path "test/invariant/**" --report lcov --report summary
+        #
+        # --no-match-coverage excludes test and script sources from the *report*
+        # while still running them. Excluding the invariant suite from the run
+        # instead (the earlier approach) both lost its real src/ coverage and
+        # counted the handler itself as uncovered source, understating the true
+        # figure by roughly fifteen points.
+        run: forge coverage --no-match-coverage "(test|script)/" --report lcov --report summary
 
       - uses: codecov/codecov-action@v4
         continue-on-error: true

@@ -4,11 +4,11 @@ Blockchain infrastructure for aviation assets — a verified asset registry, dig
 asset passport, maintenance and document proofs, ownership tracking, marketplace and
 escrow.
 
-> **Status: Phase 7 complete** — all five layers are implemented and tested: protocol
-> core (L0), identity (L1), assets (L2), provenance (L3) and the full transaction
-> layer (L4) including escrow and disputes. Remaining: invariant/fuzz hardening,
-> static analysis and deployment. This is not audited software and must not be used
-> with real funds.
+> **Status: Phase 8 complete** — all five layers are implemented and tested, and the
+> protocol invariants are executable rather than aspirational: a handler-driven suite
+> asserts 18 of them after every step of randomized action sequences. Remaining:
+> deployment scripts and a Sepolia end-to-end run, then an independent audit. This is
+> not audited software and must not be used with real funds.
 
 ---
 
@@ -69,7 +69,7 @@ cd /mnt/d/Solidity-Foundry/aero-asset-protocol && export PATH=$HOME/.foundry/bin
 Other useful commands:
 
 ```bash
-forge fmt && forge test -vvv && forge snapshot && forge coverage --report summary
+forge fmt && forge test -vvv && forge snapshot && forge coverage --no-match-coverage "(test|script)/" --report summary
 ```
 
 Deployment (Phase 9) uses staged scripts; copy `.env.example` to `.env` first.
@@ -121,7 +121,7 @@ Deployment (Phase 9) uses staged scripts; copy `.env.example` to `.env` first.
 | 5 | Provenance + `AssetPassport` | ✅ |
 | 6 | `FeeManager` + `Marketplace` | ✅ |
 | 7 | Escrow + disputes | ✅ |
-| 8 | Invariants, fuzz, static analysis, gas | ⬜ |
+| 8 | Invariants, fuzz, static analysis, gas | ✅ |
 | 9 | Deployment + Sepolia E2E | ⬜ |
 
 Post-V1: independent security audit, multisig key custody, monitoring, mainnet.

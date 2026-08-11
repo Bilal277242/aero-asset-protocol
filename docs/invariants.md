@@ -88,6 +88,30 @@ remainder were derived from the state machines and data model.
 
 ---
 
+## Implementation status
+
+Implemented in `test/invariant/ProtocolInvariants.t.sol`, driven by
+`test/invariant/handlers/ProtocolHandler.sol`. Eighteen invariants are asserted after
+every step of every randomized sequence. The remainder are covered by unit tests
+(referenced from their rows above) or are deployment-time assertions belonging to
+`Verify.s.sol`.
+
+Two lessons from building it, both worth keeping:
+
+**A handler must expose nothing it needs to stay stable.** The first version had
+`registerFixtureOrg`/`registerFixtureMro` as external setters. Foundry — correctly —
+fuzzed them like any other target function, overwriting the organization ids with
+garbage so every subsequent action failed authorization. Every invariant passed, on a
+protocol that had done nothing. Fixtures are now constructor-injected.
+
+**The coverage guard is split in two.** `afterInvariant` can only assert an aggregate:
+a single bounded sequence will not reliably reach all sixteen actions, so demanding
+per-action minimums there produces a flaky test, and a flaky guard is one people learn
+to ignore. Per-action reachability is instead proved by a deterministic test that calls
+every action once and asserts each counter moved. Together they catch both failure
+modes — "the sequence did nothing" and "this action can never succeed". The second
+guard immediately found two handler actions that always reverted.
+
 ## Handler design (Phase 8)
 
 One `ProtocolHandler` drives a bounded actor set through the realistic action space:
