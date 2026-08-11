@@ -3,13 +3,13 @@ pragma solidity 0.8.28;
 
 import {IAssetOwnership} from "../../../src/interfaces/IAssetOwnership.sol";
 import {IAssetRegistry} from "../../../src/interfaces/IAssetRegistry.sol";
+import {IEscrow} from "../../../src/interfaces/IEscrow.sol";
 import {IEscrowFactory} from "../../../src/interfaces/IEscrowFactory.sol";
 import {IFeeManager} from "../../../src/interfaces/IFeeManager.sol";
 import {IMarketplace} from "../../../src/interfaces/IMarketplace.sol";
 import {DeadlineInPast, UnexpectedCaller} from "../../../src/libraries/ProtocolErrors.sol";
 import {ListingManager} from "../../../src/marketplace/ListingManager.sol";
 import {ProtocolTestBase} from "../../utils/ProtocolTestBase.sol";
-import {MockEscrow} from "../../utils/mocks/MockEscrowFactory.sol";
 
 /// @title MarketplaceTest
 /// @author AeroAsset Protocol
@@ -333,13 +333,15 @@ contract MarketplaceTest is ProtocolTestBase {
         (uint256 escrowId, address escrow) = marketplace.acceptOffer(offerId);
 
         assertEq(escrowId, 1, "wrong escrow id");
+        assertEq(escrowFactory.escrowOf(escrowId), escrow, "factory did not record the clone");
+        assertTrue(escrowFactory.isEscrow(escrow), "clone not recognised by the factory");
         assertEq(marketplace.escrowOf(listingId), escrow, "escrow not attached");
         assertEq(marketplace.getListing(listingId).escrowId, escrowId, "escrow id not recorded");
         assertEq(
             uint8(marketplace.getOffer(offerId).status), uint8(IMarketplace.OfferStatus.ACCEPTED), "offer not ACCEPTED"
         );
 
-        IEscrowFactory.EscrowTerms memory terms = escrowFactory.termsOf(escrowId);
+        IEscrowFactory.EscrowTerms memory terms = IEscrow(escrow).getTerms();
         assertEq(terms.buyer, bob, "wrong buyer");
         assertEq(terms.seller, alice, "wrong seller");
         assertEq(terms.assetId, assetId, "wrong asset");
@@ -357,13 +359,13 @@ contract MarketplaceTest is ProtocolTestBase {
         uint256 offerId = marketplace.makeOffer(listingId, PRICE, uint40(block.timestamp + 7 days));
 
         vm.prank(alice);
-        (uint256 escrowId,) = marketplace.acceptOffer(offerId);
-        uint128 quotedFee = escrowFactory.termsOf(escrowId).feeAmount;
+        (, address escrow) = marketplace.acceptOffer(offerId);
+        uint128 quotedFee = IEscrow(escrow).getTerms().feeAmount;
 
         vm.prank(protocolAdmin);
         feeManager.setFeeBps(keccak256("aeroasset.fee.MARKETPLACE"), 1000);
 
-        assertEq(escrowFactory.termsOf(escrowId).feeAmount, quotedFee, "live trade was re-priced");
+        assertEq(IEscrow(escrow).getTerms().feeAmount, quotedFee, "live trade was re-priced");
     }
 
     /// @notice Acceptance fails if the seller no longer owns the asset. INV-MKT-04.
@@ -433,9 +435,11 @@ contract MarketplaceTest is ProtocolTestBase {
     /// @notice A released escrow marks its listing sold.
     function test_MarkSold_ByAttachedEscrow() public {
         (uint256 listingId, address escrow) = _acceptedTrade();
-        _grantSettlementRole(escrow);
-
-        MockEscrow(escrow).markSold();
+        _fundBuyer(bob, escrow, PRICE);
+        vm.prank(bob);
+        IEscrow(escrow).fund();
+        vm.prank(bob);
+        IEscrow(escrow).release();
 
         assertEq(uint8(marketplace.getListing(listingId).status), uint8(IMarketplace.ListingStatus.SOLD), "not SOLD");
         assertEq(marketplace.escrowOf(listingId), address(0), "escrow not detached");
@@ -447,9 +451,9 @@ contract MarketplaceTest is ProtocolTestBase {
     ///      an escrow is attached, so one failed trade would freeze it permanently.
     function test_ClearEscrow_LeavesListingActive() public {
         (uint256 listingId, address escrow) = _acceptedTrade();
-        _grantSettlementRole(escrow);
 
-        MockEscrow(escrow).clearEscrow();
+        vm.prank(bob);
+        IEscrow(escrow).cancel();
 
         assertTrue(marketplace.isListingActive(listingId), "listing not still active");
         assertEq(marketplace.escrowOf(listingId), address(0), "escrow not detached");

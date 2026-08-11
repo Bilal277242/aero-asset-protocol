@@ -45,6 +45,15 @@ library ProtocolRoles {
     ///      protocol-internal trust delegation, never granted to an EOA.
     bytes32 internal constant ASSET_MINTER_ROLE = keccak256("aeroasset.role.ASSET_MINTER");
 
+    /// @notice Machine role held by `EscrowFactory`; administers {SETTLEMENT_ROLE}.
+    /// @dev The factory must be able to grant `SETTLEMENT_ROLE` to each clone it
+    ///      deploys, and granting requires holding that role's *admin*. Rather than
+    ///      hand the factory `DEFAULT_ADMIN_ROLE` — which would give a factory total
+    ///      control of protocol authorization — `SETTLEMENT_ROLE`'s admin is narrowed
+    ///      to this role, which grants exactly one other role and nothing else.
+    ///      Wired by `ConfigureProtocol.s.sol` via `RoleManager.setRoleAdmin`.
+    bytes32 internal constant ESCROW_FACTORY_ROLE = keccak256("aeroasset.role.ESCROW_FACTORY");
+
     /// @notice Machine role held by live escrow clones; authorizes settlement transfers.
     /// @dev Granted by `EscrowFactory` only to a clone address it just deployed, and
     ///      revoked when that escrow reaches a terminal state. This is the protocol's

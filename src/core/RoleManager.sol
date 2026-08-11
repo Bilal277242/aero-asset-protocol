@@ -29,6 +29,10 @@ contract RoleManager is AccessControlEnumerable, IRoleManager {
     ///      OpenZeppelin permits it; this protocol does not.
     error LastProtocolAdmin();
 
+    /// @notice Thrown when re-administering `DEFAULT_ADMIN_ROLE` is attempted.
+    /// @dev It must remain self-administered, or the timelock could be routed around.
+    error CannotReadministerDefaultAdmin();
+
     /// @notice Deploys the role manager and seeds the initial protocol admin.
     /// @dev `initialAdmin` should be `ProtocolTimelock` in production. A deployment
     ///      script may temporarily seed a deployer EOA, but must transfer to the
@@ -48,6 +52,27 @@ contract RoleManager is AccessControlEnumerable, IRoleManager {
         if (!hasRole(role, account)) {
             revert MissingRole(role, account);
         }
+    }
+
+    /// @notice Narrows which role may grant and revoke `role`.
+    /// @dev Restricted to `DEFAULT_ADMIN_ROLE`, i.e. the timelock. Exists so a
+    ///      protocol contract can administer exactly one role without being handed
+    ///      `DEFAULT_ADMIN_ROLE`: `EscrowFactory` must grant `SETTLEMENT_ROLE` to each
+    ///      clone it deploys, and granting requires holding that role's admin. Scoping
+    ///      the admin to `ESCROW_FACTORY_ROLE` gives the factory that one power and
+    ///      nothing else.
+    ///
+    ///      `DEFAULT_ADMIN_ROLE` itself cannot be re-administered — allowing that
+    ///      would let the timelock be routed around, which the last-admin protection
+    ///      exists to prevent.
+    /// @param role The role whose admin is being changed.
+    /// @param adminRole The role that will administer it.
+    function setRoleAdmin(bytes32 role, bytes32 adminRole) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (role == DEFAULT_ADMIN_ROLE) {
+            revert CannotReadministerDefaultAdmin();
+        }
+
+        _setRoleAdmin(role, adminRole);
     }
 
     /// @notice Removes `role` from `account`, refusing to remove the final admin.

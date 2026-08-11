@@ -79,13 +79,14 @@ Legend — `ADMIN` = `PROTOCOL_ADMIN_ROLE` · `OWNER` = asset owner per `AssetOw
 | `.acceptOffer` / `.rejectOffer` | listing `seller` | Accept opens the escrow. |
 | `.expireOffer` | — | Only past `expiresAt`. |
 | `.markSold` | `SETTLEMENT_ROLE` | Called by the settling escrow only. |
-| `EscrowFactory.openEscrow` | `Marketplace` only | Address-registry check, not a role. |
-| `Escrow.fund` | escrow `buyer` | |
-| `.release` | escrow `buyer` | |
-| `.cancel` | buyer or seller; anyone after `fundingDeadline` | |
-| `.raiseDispute` | buyer or seller, before `settlementDeadline` | |
-| `.resolveDispute` | `ARBITRATOR_ROLE` | Only from `DISPUTED`. |
-| `.claimTimeout` | — | Past `settlementDeadline`. **Callable while paused.** |
+| `EscrowFactory.openEscrow` | `Marketplace` only | Address-registry check, not a role. Grants `SETTLEMENT_ROLE` to the clone it just deployed, verified against the predicted address. |
+| `Escrow.initialize` | `EscrowFactory` only | Once. Rejects a fee exceeding the price. |
+| `.fund` | escrow `buyer` | Exact **measured** deposit; locks the asset. |
+| `.release` | escrow `buyer` | Only the buyer, so a seller cannot take payment without the buyer confirming delivery. |
+| `.cancel` | buyer or seller; anyone after `fundingDeadline` | Unfunded only. |
+| `.raiseDispute` | buyer or seller, before `settlementDeadline` | Unavailable afterwards, so it cannot block the refund path. |
+| `.resolveDispute` | `ARBITRATOR_ROLE` | Only from `DISPUTED`. Picks a winner; cannot alter amounts or pay a third party. |
+| `.claimTimeout` | — | Past `settlementDeadline`. **Works while the protocol is paused.** |
 | `FeeManager.setFeeBps` | `FEE_MANAGER_ROLE` | Hard-capped by a `constant`. |
 | `.setTreasury` | `FEE_MANAGER_ROLE` | Non-zero. |
 | `.setTokenAllowed` | `ADMIN` | Timelocked. |

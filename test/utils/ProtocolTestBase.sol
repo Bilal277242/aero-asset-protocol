@@ -7,6 +7,8 @@ import {ComponentRegistry} from "../../src/assets/ComponentRegistry.sol";
 import {ProtocolAddressRegistry} from "../../src/core/ProtocolAddressRegistry.sol";
 import {RoleManager} from "../../src/core/RoleManager.sol";
 import {DocumentRegistry} from "../../src/documents/DocumentRegistry.sol";
+import {Escrow} from "../../src/escrow/Escrow.sol";
+import {EscrowFactory} from "../../src/escrow/EscrowFactory.sol";
 import {FeeManager} from "../../src/fees/FeeManager.sol";
 import {CredentialRegistry} from "../../src/identity/CredentialRegistry.sol";
 import {OrganizationRegistry} from "../../src/identity/OrganizationRegistry.sol";
@@ -26,7 +28,6 @@ import {AssetOwnership} from "../../src/ownership/AssetOwnership.sol";
 import {AssetPassport} from "../../src/passport/AssetPassport.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
-import {MockEscrowFactory} from "./mocks/MockEscrowFactory.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /// @title ProtocolTestBase
@@ -87,8 +88,10 @@ abstract contract ProtocolTestBase is BaseTest {
     Marketplace internal marketplace;
     /// @notice The `Marketplace` implementation behind the proxy.
     address internal marketplaceImpl;
-    /// @notice Stand-in escrow factory. Phase 7 replaces it with the real one.
-    MockEscrowFactory internal escrowFactory;
+    /// @notice The immutable per-trade escrow factory.
+    EscrowFactory internal escrowFactory;
+    /// @notice The shared `Escrow` implementation every clone delegates to.
+    address internal escrowImpl;
     /// @notice Allowlisted settlement token.
     MockERC20 internal settlementToken;
 
@@ -224,7 +227,17 @@ abstract contract ProtocolTestBase is BaseTest {
                 )
             )
         );
-        escrowFactory = new MockEscrowFactory(address(marketplace));
+        escrowImpl = address(new Escrow(address(roleManager), address(addressRegistry)));
+        escrowFactory = new EscrowFactory(address(roleManager), address(addressRegistry), escrowImpl);
+
+        // SETTLEMENT_ROLE is administered by ESCROW_FACTORY_ROLE rather than by
+        // DEFAULT_ADMIN_ROLE, so the factory can grant it to each clone it deploys
+        // without holding blanket admin over the protocol.
+        roleManager.setRoleAdmin(ProtocolRoles.SETTLEMENT_ROLE, ProtocolRoles.ESCROW_FACTORY_ROLE);
+        roleManager.grantRole(ProtocolRoles.ESCROW_FACTORY_ROLE, address(escrowFactory));
+        // Test-only convenience so suites can install a stand-in settlement contract.
+        // Production grants this to the factory alone.
+        roleManager.grantRole(ProtocolRoles.ESCROW_FACTORY_ROLE, protocolAdmin);
 
         roleManager.grantRole(ProtocolRoles.FEE_MANAGER_ROLE, protocolAdmin);
         feeManager.setTokenAllowed(address(settlementToken), true);
@@ -273,7 +286,8 @@ abstract contract ProtocolTestBase is BaseTest {
         vm.label(address(feeManager), "FeeManager");
         vm.label(address(marketplace), "Marketplace");
         vm.label(marketplaceImpl, "MarketplaceImpl");
-        vm.label(address(escrowFactory), "MockEscrowFactory");
+        vm.label(address(escrowFactory), "EscrowFactory");
+        vm.label(escrowImpl, "EscrowImpl");
         vm.label(address(settlementToken), "SettlementToken");
     }
 
@@ -474,13 +488,62 @@ abstract contract ProtocolTestBase is BaseTest {
             marketplace.createListing(assetId, address(settlementToken), price, uint40(block.timestamp + 30 days));
     }
 
-    /// @notice Grants `SETTLEMENT_ROLE` to an address so it can act as an escrow.
-    /// @dev Phase 7 grants this to escrow clones from `EscrowFactory`; until then the
-    ///      settlement path is exercised with a stand-in holder.
+    /// @notice Grants `SETTLEMENT_ROLE` to a stand-in settlement contract.
+    /// @dev Production grants this only via `EscrowFactory` to clones it deployed.
+    ///      Suites use it to prove that holding the role alone is not sufficient.
     /// @param account The address to grant.
     function _grantSettlementRole(address account) internal {
         vm.prank(protocolAdmin);
         roleManager.grantRole(ProtocolRoles.SETTLEMENT_ROLE, account);
+    }
+
+    /// @notice Funds a buyer with settlement tokens and approves an escrow.
+    /// @param buyer The buyer to fund.
+    /// @param escrow The escrow to approve.
+    /// @param amount The amount to mint and approve.
+    function _fundBuyer(address buyer, address escrow, uint256 amount) internal {
+        settlementToken.mint(buyer, amount);
+        vm.prank(buyer);
+        settlementToken.approve(escrow, amount);
+    }
+
+    /// @notice Runs list, offer and accept, returning the opened escrow.
+    /// @param price Gross asking price.
+    /// @return assetId The listed aircraft.
+    /// @return listingId The listing id.
+    /// @return escrow The opened escrow clone.
+    function _openTrade(uint128 price) internal returns (uint256 assetId, uint256 listingId, address escrow) {
+        return _openTradeWithSalt(price, ORG_NAME_HASH);
+    }
+
+    /// @notice Opens a trade under a distinctly-named organization.
+    /// @dev Organization names and serial numbers are unique protocol-wide, so a suite
+    ///      that opens more than one trade must vary the salt. The listing outlives the
+    ///      escrow's settlement window, so a timed-out trade returns a listing that is
+    ///      still active rather than one that lapsed on its own.
+    /// @param price Gross asking price.
+    /// @param salt Distinguishes the organization and aircraft from other fixtures.
+    /// @return assetId The listed aircraft.
+    /// @return listingId The listing id.
+    /// @return escrow The opened escrow clone.
+    function _openTradeWithSalt(uint128 price, bytes32 salt)
+        internal
+        returns (uint256 assetId, uint256 listingId, address escrow)
+    {
+        uint256 orgId = _registerVerifiedOrg(alice, salt, IOrganizationRegistry.OrganizationType.AIRLINE);
+        assetId = _registerAircraft(orgId, alice, alice, keccak256(abi.encode("MSN", salt)));
+
+        vm.prank(orgVerifier);
+        assetRegistry.verifyAsset(assetId, orgId);
+
+        vm.prank(alice);
+        listingId =
+            marketplace.createListing(assetId, address(settlementToken), price, uint40(block.timestamp + 300 days));
+
+        vm.prank(bob);
+        uint256 offerId = marketplace.makeOffer(listingId, price, uint40(block.timestamp + 7 days));
+        vm.prank(alice);
+        (, escrow) = marketplace.acceptOffer(offerId);
     }
 
     /// @notice Registers a verified MRO holding a valid maintenance-authority credential.

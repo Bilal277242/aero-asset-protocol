@@ -23,14 +23,31 @@ so a role constant can never collide with an unrelated protocol's constant if th
 | `ARBITRATOR_ROLE` | `keccak256("aeroasset.role.ARBITRATOR")` | Named arbitrator EOA/multisig | No |
 | `FEE_MANAGER_ROLE` | `keccak256("aeroasset.role.FEE_MANAGER")` | `ProtocolTimelock` | Yes |
 | `ASSET_MINTER_ROLE` | `keccak256("aeroasset.role.ASSET_MINTER")` | `AircraftRegistry`, `ComponentRegistry` (machine role) | n/a |
+| `ESCROW_FACTORY_ROLE` | `keccak256("aeroasset.role.ESCROW_FACTORY")` | `EscrowFactory` (machine role) | n/a |
 | `SETTLEMENT_ROLE` | `keccak256("aeroasset.role.SETTLEMENT")` | Escrow clones (machine role) | n/a |
 
 ### 1.1 Role admin graph
 
-`DEFAULT_ADMIN_ROLE` is the admin of **every** other role. It is granted to
-`ProtocolTimelock` and to nothing else. Consequence: every grant and revoke in the
+`DEFAULT_ADMIN_ROLE` is the admin of every other role **except one**, and is granted
+to `ProtocolTimelock` and nothing else. Consequence: every grant and revoke in the
 protocol — including revoking a compromised `ORG_VERIFIER` — passes through the
 timelock's delay and is publicly visible before it takes effect.
+
+**The one exception is `SETTLEMENT_ROLE`, administered by `ESCROW_FACTORY_ROLE`.**
+`EscrowFactory` must grant `SETTLEMENT_ROLE` to every clone it deploys, and granting
+requires holding that role's admin. The alternative — giving the factory
+`DEFAULT_ADMIN_ROLE` — would hand a factory total control of protocol authorization to
+solve a far narrower problem. `ESCROW_FACTORY_ROLE` confers exactly one power: granting
+`SETTLEMENT_ROLE`. It is itself administered by the timelock, so it remains revocable
+on the normal path.
+
+`RoleManager.setRoleAdmin` performs this narrowing and is itself `DEFAULT_ADMIN_ROLE`-
+gated. `DEFAULT_ADMIN_ROLE` cannot be re-administered — allowing that would let the
+timelock be routed around entirely.
+
+Escrows are never revoked by the factory: each clone **renounces its own**
+`SETTLEMENT_ROLE` on reaching a terminal state, so disarming involves no admin key at
+all.
 
 The deployer's `DEFAULT_ADMIN_ROLE` is renounced in `ConfigureProtocol.s.sol`, and
 `Verify.s.sol` asserts `getRoleMemberCount(DEFAULT_ADMIN_ROLE) == 1` and that the sole

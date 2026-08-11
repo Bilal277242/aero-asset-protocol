@@ -35,9 +35,10 @@ contract RoleManagerTest is ProtocolTestBase {
         new RoleManager(address(0));
     }
 
-    /// @notice `DEFAULT_ADMIN_ROLE` administers every protocol role.
+    /// @notice `DEFAULT_ADMIN_ROLE` administers every human-held protocol role.
     /// @dev This is what makes the timelock the single revocation path for a
-    ///      compromised operational key. See `docs/roles.md` §1.1.
+    ///      compromised operational key. See `docs/roles.md` §1.1. `SETTLEMENT_ROLE`
+    ///      is the deliberate exception — see {test_SettlementRoleIsAdministeredByFactoryRole}.
     function test_DefaultAdminIsAdminOfEveryProtocolRole() public view {
         bytes32 defaultAdmin = roleManager.DEFAULT_ADMIN_ROLE();
         bytes32[8] memory roles = [
@@ -48,11 +49,58 @@ contract RoleManagerTest is ProtocolTestBase {
             ProtocolRoles.CREDENTIAL_ISSUER_ROLE,
             ProtocolRoles.ARBITRATOR_ROLE,
             ProtocolRoles.FEE_MANAGER_ROLE,
-            ProtocolRoles.SETTLEMENT_ROLE
+            ProtocolRoles.ASSET_MINTER_ROLE
         ];
         for (uint256 i; i < roles.length; ++i) {
             assertEq(roleManager.getRoleAdmin(roles[i]), defaultAdmin, "role not administered by default admin");
         }
+    }
+
+    /// @notice `SETTLEMENT_ROLE` is administered by `ESCROW_FACTORY_ROLE`, not the timelock.
+    /// @dev `EscrowFactory` must grant `SETTLEMENT_ROLE` to every clone it deploys, and
+    ///      granting requires holding that role's admin. Narrowing the admin to a
+    ///      dedicated role gives the factory exactly that one power; the alternative
+    ///      was handing it `DEFAULT_ADMIN_ROLE`, i.e. the whole protocol.
+    function test_SettlementRoleIsAdministeredByFactoryRole() public view {
+        assertEq(
+            roleManager.getRoleAdmin(ProtocolRoles.SETTLEMENT_ROLE),
+            ProtocolRoles.ESCROW_FACTORY_ROLE,
+            "settlement role admin not narrowed"
+        );
+        assertEq(
+            roleManager.getRoleAdmin(ProtocolRoles.ESCROW_FACTORY_ROLE),
+            roleManager.DEFAULT_ADMIN_ROLE(),
+            "factory role escapes the timelock"
+        );
+        assertTrue(
+            roleManager.hasRole(ProtocolRoles.ESCROW_FACTORY_ROLE, address(escrowFactory)),
+            "factory cannot grant settlement role"
+        );
+    }
+
+    /// @notice Only `DEFAULT_ADMIN_ROLE` may re-administer a role.
+    function testFuzz_RevertWhen_UnauthorizedSetRoleAdmin(address caller) public {
+        _assumeUnprivileged(caller);
+        vm.assume(!roleManager.hasRole(roleManager.DEFAULT_ADMIN_ROLE(), caller));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, caller, roleManager.DEFAULT_ADMIN_ROLE()
+            )
+        );
+        vm.prank(caller);
+        roleManager.setRoleAdmin(ProtocolRoles.PAUSER_ROLE, ProtocolRoles.PROTOCOL_ADMIN_ROLE);
+    }
+
+    /// @notice `DEFAULT_ADMIN_ROLE` cannot be re-administered.
+    /// @dev Allowing it would let the timelock be routed around entirely, defeating
+    ///      both the delay and the last-admin protection.
+    function test_RevertWhen_ReadministeringDefaultAdmin() public {
+        bytes32 defaultAdmin = roleManager.DEFAULT_ADMIN_ROLE();
+
+        vm.expectRevert(RoleManager.CannotReadministerDefaultAdmin.selector);
+        vm.prank(protocolAdmin);
+        roleManager.setRoleAdmin(defaultAdmin, ProtocolRoles.PROTOCOL_ADMIN_ROLE);
     }
 
     /// @notice Role identifiers are namespaced and mutually distinct.

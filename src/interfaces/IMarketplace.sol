@@ -235,6 +235,22 @@ interface IMarketplace {
     /// @param expiresAt Its expiry time.
     error OfferNotExpired(uint256 offerId, uint40 expiresAt);
 
+    /*//////////////////////////////////////////////////////////////
+                            SETTLEMENT HOOKS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Marks a listing sold once its escrow has released.
+    /// @dev Restricted to `SETTLEMENT_ROLE` **and** to the escrow attached to this
+    ///      listing. Holding the role alone is not sufficient.
+    /// @param listingId The listing to mark sold.
+    function markSold(uint256 listingId) external;
+
+    /// @notice Detaches a listing's escrow without selling.
+    /// @dev Called when an escrow reaches a non-release terminal state, so the listing
+    ///      stays `ACTIVE` rather than being stranded by a failed trade.
+    /// @param listingId The listing to detach.
+    function clearEscrow(uint256 listingId) external;
+
     /// @notice Thrown when the seller no longer owns the asset they listed.
     /// @dev Closes the "sell it twice" race: the listing's `seller` is a snapshot, and
     ///      settlement re-checks it against live ownership (`INV-MKT-04`).
