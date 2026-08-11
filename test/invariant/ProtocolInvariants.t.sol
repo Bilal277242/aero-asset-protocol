@@ -208,18 +208,31 @@ contract ProtocolInvariantsTest is ProtocolTestBase {
         uint256 count = handler.escrowCount();
         uint256 heldByLiveEscrows;
 
+        uint256 deferredAcrossEscrows;
+
         for (uint256 i; i < count; ++i) {
             IEscrow escrow = IEscrow(handler.escrows(i));
             uint256 balance = settlementToken.balanceOf(address(escrow));
+            uint256 deferred = escrow.totalDeferred();
+            deferredAcrossEscrows += deferred;
 
             if (escrow.isTerminal()) {
-                assertEq(balance, 0, "terminal escrow retained funds");
+                // A terminal escrow holds exactly what it could not deliver, and
+                // nothing else. Before audit finding AAP-13 this was `balance == 0`;
+                // an undeliverable payout is now retained as claimable rather than
+                // reverting the transition, so the residue must equal it exactly.
+                assertEq(balance, deferred, "terminal escrow balance is not its deferred payouts");
             } else {
+                assertEq(deferred, 0, "live escrow deferred a payout before settling");
                 assertEq(balance, escrow.depositedAmount(), "live escrow balance disagrees with its deposit");
                 heldByLiveEscrows += balance;
             }
         }
 
+        // `ghostPaidOut` counts a payout once the escrow has settled it, including one
+        // that had to be deferred: a deferred amount has left the live float and is
+        // owed to a named account, so it is not part of what live escrows still hold.
+        // The physical whereabouts of deferred funds is asserted per-escrow above.
         assertEq(
             handler.ghostDeposited() - handler.ghostPaidOut(),
             heldByLiveEscrows,
@@ -452,7 +465,17 @@ contract ProtocolInvariantsTest is ProtocolTestBase {
         handler.setComponentStatus(0, 1);
         handler.warpTime(1);
 
-        string[16] memory actions = [
+        // A second trade, driven to a lapsed dispute so the AAP-01 exit is reachable
+        // rather than merely present. The first escrow is already terminal above.
+        handler.createListing(1, 1);
+        handler.makeOffer(1, 1);
+        handler.acceptOffer(1);
+        handler.fundEscrow(1);
+        handler.disputeEscrow(1);
+        vm.warp(block.timestamp + 15 days);
+        handler.claimDisputeTimeout(1);
+
+        string[17] memory actions = [
             "registerAircraft",
             "registerComponent",
             "installComponent",
@@ -468,7 +491,8 @@ contract ProtocolInvariantsTest is ProtocolTestBase {
             "removeComponent",
             "setComponentStatus",
             "transferAsset",
-            "warpTime"
+            "warpTime",
+            "claimDisputeTimeout"
         ];
         for (uint256 i; i < actions.length; ++i) {
             assertGt(handler.callsOf(bytes32(bytes(actions[i]))), 0, actions[i]);

@@ -132,20 +132,49 @@ contract AssetRegistry is ProtocolModuleUpgradeable, IAssetRegistry {
         Asset storage asset = _requireExists(assetId);
         AssetStatus from = asset.status;
 
-        _ownership().requireOwner(assetId, msg.sender);
+        IAssetOwnership ownership = _ownership();
+        ownership.requireOwner(assetId, msg.sender);
         if (!isValidTransition(from, newStatus)) {
             revert InvalidAssetTransition(from, newStatus);
         }
 
-        asset.status = newStatus;
-
-        // Mirror the freeze into the ownership ledger in the same transaction, so the
-        // two can never disagree. This is the only reason L2a needs the flag at all.
-        if (newStatus == AssetStatus.RETIRED || newStatus == AssetStatus.DESTROYED) {
-            _ownership().freezeTransfers(assetId);
+        // A terminal status freezes transfers, which would make an in-flight settlement
+        // permanently unsettleable. The seller is still the owner while an escrow holds
+        // the lock, so without this they could strand a funded buyer at will. A genuine
+        // mid-trade loss is a dispute for the arbitrator, not a unilateral write.
+        if (_isTerminal(newStatus)) {
+            address lockHolder = ownership.lockHolderOf(assetId);
+            if (lockHolder != address(0)) {
+                revert AssetLockedBySettlement(assetId, lockHolder);
+            }
         }
 
-        emit AssetStatusChanged(assetId, from, newStatus);
+        _writeStatus(assetId, asset, from, newStatus);
+    }
+
+    /// @inheritdoc IAssetRegistry
+    /// @dev The recovery path for an erroneous terminal status. Restricted to
+    ///      `PROTOCOL_ADMIN_ROLE`, so on any production network every use is queued
+    ///      behind the timelock delay and publicly visible before it lands.
+    function recoverTerminalAsset(uint256 assetId, AssetStatus newStatus)
+        external
+        onlyRole(ProtocolRoles.PROTOCOL_ADMIN_ROLE)
+    {
+        Asset storage asset = _requireExists(assetId);
+        AssetStatus from = asset.status;
+
+        if (!_isTerminal(from)) {
+            revert AssetNotTerminal(assetId, from);
+        }
+        // Recovery restores an operational status; it is not a route into the other
+        // terminal state, which would be a status change dressed up as a correction.
+        if (newStatus == AssetStatus.NONE || _isTerminal(newStatus)) {
+            revert InvalidAssetTransition(from, newStatus);
+        }
+
+        _writeStatus(assetId, asset, from, newStatus);
+
+        emit AssetTerminalStatusRecovered(assetId, from, newStatus, msg.sender);
     }
 
     /// @inheritdoc IAssetRegistry
@@ -242,12 +271,17 @@ contract AssetRegistry is ProtocolModuleUpgradeable, IAssetRegistry {
         return _s().assetCount;
     }
 
-    /// @notice Reports whether an operational status transition is permitted.
-    /// @dev The legal set is expressed exactly once, here. Operational statuses are
-    ///      mutually reachable; terminal statuses are reachable from any operational
-    ///      status and have no exit, which is what makes `INV-ASSET-04` hold. A
-    ///      transition to the same status is rejected as a no-op that would emit a
-    ///      misleading event. See `docs/state-machines.md` §3.
+    /// @notice Reports whether an owner-initiated status transition is permitted.
+    /// @dev The legal set is expressed exactly once, here. A transition to the same
+    ///      status is rejected as a no-op that would emit a misleading event.
+    ///
+    ///      **`RETIRED` is reversible; `DESTROYED` is not.** Retirement is a reversible
+    ///      real-world state — stored airframes are routinely returned to service — and
+    ///      modelling it as absorbing meant a returning aircraft had to be re-registered
+    ///      under a new id, orphaning its entire document and maintenance provenance.
+    ///      Destruction is genuinely absorbing and stays that way; correcting an
+    ///      erroneous one is {recoverTerminalAsset}, behind the timelock.
+    ///      See `docs/state-machines.md` §3.
     /// @param from The current status.
     /// @param to The proposed status.
     /// @return True if the transition is legal.
@@ -258,9 +292,13 @@ contract AssetRegistry is ProtocolModuleUpgradeable, IAssetRegistry {
         if (from == to) {
             return false;
         }
-        // Terminal statuses are absorbing.
-        if (from == AssetStatus.RETIRED || from == AssetStatus.DESTROYED) {
+        if (from == AssetStatus.DESTROYED) {
             return false;
+        }
+        // Returning from retirement re-enters service; it must not hop straight to the
+        // other terminal state, which would skip the operational record entirely.
+        if (from == AssetStatus.RETIRED) {
+            return to != AssetStatus.DESTROYED;
         }
         // Every operational status can reach every other, and either terminal status.
         return true;
@@ -269,6 +307,36 @@ contract AssetRegistry is ProtocolModuleUpgradeable, IAssetRegistry {
     /*//////////////////////////////////////////////////////////////
                                 INTERNAL
     //////////////////////////////////////////////////////////////*/
+
+    /// @notice Writes a status change and keeps the ownership freeze mirror in step.
+    /// @dev Every status write in this contract funnels through here, so the mirror
+    ///      cannot drift from the status it reflects (`INV-OWN-06`) — no individual
+    ///      transition has to remember to freeze or unfreeze.
+    /// @param assetId The asset id.
+    /// @param asset Storage pointer to the record.
+    /// @param from The current status.
+    /// @param to The status to move to.
+    function _writeStatus(uint256 assetId, Asset storage asset, AssetStatus from, AssetStatus to) private {
+        asset.status = to;
+
+        bool wasTerminal = _isTerminal(from);
+        bool isNowTerminal = _isTerminal(to);
+
+        if (isNowTerminal && !wasTerminal) {
+            _ownership().freezeTransfers(assetId);
+        } else if (wasTerminal && !isNowTerminal) {
+            _ownership().unfreezeTransfers(assetId);
+        }
+
+        emit AssetStatusChanged(assetId, from, to);
+    }
+
+    /// @notice Reports whether a status freezes transfers.
+    /// @param status The status to test.
+    /// @return True for `RETIRED` and `DESTROYED`.
+    function _isTerminal(AssetStatus status) private pure returns (bool) {
+        return status == AssetStatus.RETIRED || status == AssetStatus.DESTROYED;
+    }
 
     /// @notice Shared registration path for both entry points.
     /// @param orgId The registering organization, already authorized by the caller.

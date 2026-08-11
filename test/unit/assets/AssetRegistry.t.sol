@@ -385,6 +385,10 @@ contract AssetRegistryTest is ProtocolTestBase {
     }
 
     /// @notice The transition table matches `docs/state-machines.md` §3 exactly.
+    /// @dev `RETIRED` is reversible into any operational status but must not reach
+    ///      `DESTROYED` directly; `DESTROYED` is absorbing for every owner-initiated
+    ///      transition. Correcting an erroneous `DESTROYED` is `recoverTerminalAsset`,
+    ///      which is timelocked and bypasses this table.
     function test_TransitionTable_MatchesSpecification() public view {
         uint8 destroyed = uint8(IAssetRegistry.AssetStatus.DESTROYED);
         uint8 registered = uint8(IAssetRegistry.AssetStatus.REGISTERED);
@@ -394,7 +398,13 @@ contract AssetRegistryTest is ProtocolTestBase {
             for (uint8 to; to <= destroyed; ++to) {
                 bool fromOperational = from >= registered && from < retired;
                 bool toValid = to != 0;
-                bool expected = fromOperational && toValid && from != to;
+
+                bool expected;
+                if (fromOperational) {
+                    expected = toValid && from != to;
+                } else if (from == retired) {
+                    expected = toValid && to != retired && to != destroyed;
+                }
 
                 assertEq(
                     assetRegistry.isValidTransition(IAssetRegistry.AssetStatus(from), IAssetRegistry.AssetStatus(to)),

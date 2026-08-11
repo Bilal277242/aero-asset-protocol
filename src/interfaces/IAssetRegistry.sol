@@ -105,6 +105,18 @@ interface IAssetRegistry {
     /// @param newStatus The status after the transition.
     event AssetStatusChanged(uint256 indexed assetId, AssetStatus indexed oldStatus, AssetStatus indexed newStatus);
 
+    /// @notice Emitted when an admin corrects an erroneous terminal status.
+    /// @dev Distinct from {AssetStatusChanged}, which is also emitted, so that the rare
+    ///      and privileged case is trivially filterable in an audit trail rather than
+    ///      hidden among routine owner transitions.
+    /// @param assetId The asset id.
+    /// @param from The terminal status being corrected.
+    /// @param to The operational status restored.
+    /// @param by The admin that performed the correction.
+    event AssetTerminalStatusRecovered(
+        uint256 indexed assetId, AssetStatus indexed from, AssetStatus indexed to, address by
+    );
+
     /// @notice Emitted when an asset's verification state changes.
     /// @param assetId The asset id.
     /// @param verifierOrgId The organization credited, or 0.
@@ -140,6 +152,18 @@ interface IAssetRegistry {
     /// @param assetId The asset id.
     /// @param status Its terminal status.
     error AssetTerminal(uint256 assetId, AssetStatus status);
+
+    /// @notice Thrown when recovery is attempted on an asset that is not terminal.
+    /// @param assetId The asset id.
+    /// @param status Its current, non-terminal status.
+    error AssetNotTerminal(uint256 assetId, AssetStatus status);
+
+    /// @notice Thrown when a terminal status would strand a live settlement.
+    /// @dev Freezing an asset an escrow has locked would make that trade permanently
+    ///      unsettleable while the buyer's funds are already committed.
+    /// @param assetId The asset id.
+    /// @param lockHolder The settlement contract currently holding the lock.
+    error AssetLockedBySettlement(uint256 assetId, address lockHolder);
 
     /// @notice Thrown when an asset is not of the required kind.
     /// @param assetId The asset id.
@@ -224,10 +248,25 @@ interface IAssetRegistry {
 
     /// @notice Moves an asset to a new operational status.
     /// @dev Callable by the current owner. Entering a terminal status freezes the
-    ///      asset's transferability in `AssetOwnership`, atomically.
+    ///      asset's transferability in `AssetOwnership`, atomically; leaving `RETIRED`
+    ///      unfreezes it, also atomically.
+    ///
+    ///      Reverts with `AssetLockedBySettlement` if a terminal status is requested
+    ///      while an escrow holds the asset's transfer lock — the owner must not be
+    ///      able to strand a buyer who has already committed funds.
     /// @param assetId The asset id.
     /// @param newStatus The status to move to.
     function setAssetStatus(uint256 assetId, AssetStatus newStatus) external;
+
+    /// @notice Restores a terminal asset to an operational status.
+    /// @dev Restricted to `PROTOCOL_ADMIN_ROLE`, i.e. timelocked and publicly queued on
+    ///      any production network. This is an error-correction path, not a routine
+    ///      one: `DESTROYED` is otherwise absorbing, and without this an erroneous
+    ///      terminal status would permanently orphan an asset's provenance chain with
+    ///      no recourse available to anyone.
+    /// @param assetId The asset id.
+    /// @param newStatus The operational status to restore. Must not be terminal.
+    function recoverTerminalAsset(uint256 assetId, AssetStatus newStatus) external;
 
     /// @notice Records that an asset has been verified.
     /// @dev Restricted to `ASSET_VERIFIER_ROLE`. Deliberately separate from

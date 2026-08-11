@@ -80,6 +80,25 @@ interface IEscrow {
     /// @param feeType The fee category charged.
     event FeeCollected(address indexed token, address indexed treasury, uint256 amount, bytes32 indexed feeType);
 
+    /// @notice Emitted when a payout could not be delivered and was made claimable.
+    /// @dev The escrow still reaches its terminal state; the amount is recoverable by
+    ///      the recipient through {withdraw} once whatever blocked the transfer — a
+    ///      token blacklist, most plausibly — no longer applies. A recipient who can
+    ///      never receive must not be able to block the counterparty's settlement.
+    /// @param recipient The account the transfer was intended for.
+    /// @param amount The amount now claimable.
+    event PayoutDeferred(address indexed recipient, uint256 amount);
+
+    /// @notice Emitted when a deferred payout is successfully claimed.
+    /// @param recipient The claiming account.
+    /// @param amount The amount withdrawn.
+    event PayoutWithdrawn(address indexed recipient, uint256 amount);
+
+    /// @notice Emitted when a party disputes, recording when arbitration must complete.
+    /// @param escrowId The escrow id.
+    /// @param deadline After this, {claimDisputeTimeout} refunds the buyer.
+    event DisputeDeadlineSet(uint256 indexed escrowId, uint40 deadline);
+
     /*//////////////////////////////////////////////////////////////
                                   ERRORS
     //////////////////////////////////////////////////////////////*/
@@ -133,6 +152,15 @@ interface IEscrow {
     /// @param price The trade price.
     error FeeExceedsPrice(uint128 feeAmount, uint128 price);
 
+    /// @notice Thrown when claiming a dispute timeout before arbitration has run out.
+    /// @param deadline The dispute-resolution deadline.
+    /// @param nowTs The block timestamp.
+    error DisputeDeadlineNotPassed(uint40 deadline, uint40 nowTs);
+
+    /// @notice Thrown when withdrawing a deferred payout with nothing owed.
+    /// @param account The claiming account.
+    error NothingToWithdraw(address account);
+
     /*//////////////////////////////////////////////////////////////
                                 FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -170,6 +198,21 @@ interface IEscrow {
     ///      unresponsive counterparty.
     function claimTimeout() external;
 
+    /// @notice Refunds the buyer when arbitration has not happened in time.
+    /// @dev **Permissionless**, and the reason `DISPUTED` is not a trap. Without it a
+    ///      party could freeze the counterparty's funds indefinitely simply by
+    ///      disputing, and an unavailable arbitrator would strand every disputed trade
+    ///      forever. Refund-by-default matches {claimTimeout}: settlement can stall,
+    ///      refunds cannot.
+    function claimDisputeTimeout() external;
+
+    /// @notice Claims a payout that could not be delivered at settlement.
+    /// @dev The escape hatch for a recipient that was untransferable at the moment the
+    ///      escrow settled — a blacklisted account, most plausibly. Anyone may trigger
+    ///      the claim; funds only ever go to the recorded recipient.
+    /// @param account The recipient whose deferred balance is being claimed.
+    function withdraw(address account) external;
+
     /*//////////////////////////////////////////////////////////////
                                   VIEWS
     //////////////////////////////////////////////////////////////*/
@@ -189,4 +232,28 @@ interface IEscrow {
     /// @notice Reports whether the escrow has reached a terminal state.
     /// @return True if released, refunded or cancelled.
     function isTerminal() external view returns (bool);
+
+    /// @notice Returns how long an arbitrator has to resolve a dispute.
+    /// @dev A published constant, so both parties know the bound before they trade.
+    /// @return The window in seconds.
+    function DISPUTE_RESOLUTION_WINDOW() external view returns (uint40);
+
+    /// @notice Returns when the dispute was raised, or 0 if none has been.
+    /// @return The dispute timestamp.
+    function disputeRaisedAt() external view returns (uint40);
+
+    /// @notice Returns the deadline by which arbitration must complete.
+    /// @dev Zero while no dispute is open.
+    /// @return The dispute-resolution deadline.
+    function disputeDeadline() external view returns (uint40);
+
+    /// @notice Returns an account's undelivered payout.
+    /// @param account The recipient to query.
+    /// @return The amount claimable through {withdraw}.
+    function withdrawable(address account) external view returns (uint256);
+
+    /// @notice Returns the total undelivered payout held by this escrow.
+    /// @dev A terminal escrow's token balance equals exactly this (`INV-ESC-03`).
+    /// @return The total deferred amount.
+    function totalDeferred() external view returns (uint256);
 }

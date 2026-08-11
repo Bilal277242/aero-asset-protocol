@@ -423,22 +423,40 @@ contract AssetOwnershipTest is ProtocolTestBase {
         assertEq(assetOwnership.ownerOf(assetId), carol, "asset moved despite stale owner");
     }
 
-    /// @notice An asset frozen after being locked cannot be settled.
-    /// @dev Freezing does not require the asset to be unlocked, so this ordering is
-    ///      genuinely reachable: an owner can destroy an aircraft mid-trade. The buyer
-    ///      is not stranded — the escrow's refund path returns their funds.
-    function test_RevertWhen_SettlingFrozenAsset() public {
+    /// @notice An owner cannot freeze an asset out from under a live settlement.
+    /// @dev Audit AAP-02. Previously the owner could destroy an aircraft mid-trade,
+    ///      permanently freezing it and leaving the funded buyer to wait out the
+    ///      settlement window for a refund. The freeze is now refused while a lock is
+    ///      held, so the settlement it would have blocked still completes.
+    function test_RevertWhen_FreezingLockedAsset() public {
         vm.prank(escrow);
         assetOwnership.setTransferLock(assetId, true);
 
+        vm.expectRevert(abi.encodeWithSelector(IAssetRegistry.AssetLockedBySettlement.selector, assetId, escrow));
         vm.prank(alice);
         assetRegistry.setAssetStatus(assetId, IAssetRegistry.AssetStatus.DESTROYED);
 
-        vm.expectRevert(abi.encodeWithSelector(IAssetOwnership.AssetTransferFrozen.selector, assetId));
+        // The trade the freeze would have stranded settles normally.
         vm.prank(escrow);
         assetOwnership.settleTransfer(assetId, alice, bob);
+        assertEq(assetOwnership.ownerOf(assetId), bob, "settlement did not complete");
+    }
 
-        assertEq(assetOwnership.ownerOf(assetId), alice, "destroyed asset changed hands");
+    /// @notice Lock and freeze are mutually exclusive in both directions.
+    /// @dev The other half of AAP-02. `test_RevertWhen_LockingFrozenAsset` already
+    ///      covers freeze-then-lock; together with the test above, no escrow can ever
+    ///      hold a lock on an asset that has become unsettleable.
+    function test_LockAndFreezeAreMutuallyExclusive() public {
+        vm.prank(escrow);
+        assetOwnership.setTransferLock(assetId, true);
+        assertFalse(assetOwnership.getOwnership(assetId).transferFrozen, "locked asset is frozen");
+
+        vm.prank(escrow);
+        assetOwnership.setTransferLock(assetId, false);
+
+        vm.prank(alice);
+        assetRegistry.setAssetStatus(assetId, IAssetRegistry.AssetStatus.DESTROYED);
+        assertEq(assetOwnership.lockHolderOf(assetId), address(0), "frozen asset is locked");
     }
 
     /// @notice Settlement rejects a zero or no-op recipient.

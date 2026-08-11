@@ -42,6 +42,15 @@ import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/Reentrancy
 ///      5. **The escrow disarms itself.** It renounces `SETTLEMENT_ROLE` on entry to
 ///         any terminal state, so its ability to move an aircraft exists only for the
 ///         window in which the trade is live (`INV-ESC-05`).
+///      6. **Every funded escrow has an exit no single party can remove.** Each
+///         non-terminal state is bounded by a deadline after which a permissionless
+///         call reaches a terminal state: `AWAITING_FUNDING` by `fundingDeadline`,
+///         `FUNDED` by `settlementDeadline`, and `DISPUTED` by
+///         {DISPUTE_RESOLUTION_WINDOW}. Arbitration can therefore fail, stall or be
+///         abandoned without any deposit becoming unrecoverable.
+///      7. **A recipient who cannot receive cannot block settlement.** Payouts that
+///         revert — a blacklisted account on a token like USDC — are credited as
+///         claimable instead of reverting the transition. See {_payout}.
 ///
 ///      Deliberately **not pausable**. A pause must never strand a buyer's deposit, and
 ///      the refund paths here are the last resort. Pausing `AssetOwnership` still
@@ -66,6 +75,15 @@ contract Escrow is IEscrow, Initializable, ReentrancyGuardTransient {
                                   STATE
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice How long an arbitrator has to resolve a dispute before the buyer may
+    ///         reclaim the deposit.
+    /// @dev Measured from the moment the dispute is raised. Without this window
+    ///      `DISPUTED` has no exit that does not depend on a third party choosing to
+    ///      act, which makes it a trap: either party could freeze the counterparty's
+    ///      funds indefinitely at the cost of one transaction, and a lost arbitrator
+    ///      key would strand every disputed trade permanently.
+    uint40 public constant DISPUTE_RESOLUTION_WINDOW = 14 days;
+
     /// @notice This escrow's id, assigned by the factory.
     uint256 public escrowId;
 
@@ -76,9 +94,19 @@ contract Escrow is IEscrow, Initializable, ReentrancyGuardTransient {
     EscrowStatus public status;
 
     /// @inheritdoc IEscrow
+    /// @dev Packed against `status`; both are written together on the dispute path.
+    uint40 public disputeRaisedAt;
+
+    /// @inheritdoc IEscrow
     /// @dev The **measured** balance delta from the buyer's transfer, not the amount
     ///      requested.
     uint256 public depositedAmount;
+
+    /// @inheritdoc IEscrow
+    mapping(address account => uint256 amount) public withdrawable;
+
+    /// @inheritdoc IEscrow
+    uint256 public totalDeferred;
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTION
@@ -232,7 +260,30 @@ contract Escrow is IEscrow, Initializable, ReentrancyGuardTransient {
 
         _setStatus(EscrowStatus.DISPUTED);
 
+        // Start the arbitration clock. `DISPUTED` must never be reachable without a
+        // bounded exit; see {claimDisputeTimeout}.
+        uint40 raisedAt = uint40(block.timestamp);
+        disputeRaisedAt = raisedAt;
+
         emit DisputeRaised(escrowId, msg.sender);
+        emit DisputeDeadlineSet(escrowId, raisedAt + DISPUTE_RESOLUTION_WINDOW);
+    }
+
+    /// @inheritdoc IEscrow
+    function claimDisputeTimeout() external nonReentrant {
+        if (status != EscrowStatus.DISPUTED) {
+            revert InvalidEscrowTransition(status, EscrowStatus.REFUNDED);
+        }
+
+        uint40 deadline = disputeRaisedAt + DISPUTE_RESOLUTION_WINDOW;
+        if (block.timestamp <= deadline) {
+            revert DisputeDeadlineNotPassed(deadline, uint40(block.timestamp));
+        }
+
+        // The buyer is made whole. Refund-by-default removes the incentive to dispute
+        // as a griefing tactic: a party who disputes to stall now only delays a refund
+        // they were never able to prevent.
+        _refund();
     }
 
     /// @inheritdoc IEscrow
@@ -269,6 +320,12 @@ contract Escrow is IEscrow, Initializable, ReentrancyGuardTransient {
         return status == EscrowStatus.RELEASED || status == EscrowStatus.REFUNDED || status == EscrowStatus.CANCELLED;
     }
 
+    /// @inheritdoc IEscrow
+    function disputeDeadline() external view returns (uint40) {
+        uint40 raisedAt = disputeRaisedAt;
+        return raisedAt == 0 ? 0 : raisedAt + DISPUTE_RESOLUTION_WINDOW;
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 INTERNAL
     //////////////////////////////////////////////////////////////*/
@@ -295,9 +352,16 @@ contract Escrow is IEscrow, Initializable, ReentrancyGuardTransient {
         IERC20 token = IERC20(terms.paymentToken);
         if (fee != 0) {
             address treasury = _fees().treasury();
-            token.safeTransfer(treasury, fee);
+            // Deferrable. A treasury that cannot receive must not halt settlement for
+            // every trade in the protocol at once; the fee is claimable later.
+            _payout(token, treasury, fee);
             emit FeeCollected(terms.paymentToken, treasury, fee, ProtocolFeeTypes.MARKETPLACE);
         }
+
+        // **Strict, deliberately.** If the seller cannot be paid, the aircraft must not
+        // change hands: reverting leaves the trade intact and retryable, and the buyer
+        // still reaches a refund through `claimTimeout`. Deferring here would hand over
+        // the asset against an IOU, which is the one outcome worse than a failed trade.
         token.safeTransfer(terms.seller, proceeds);
 
         emit EscrowSettled(escrowId, terms.seller, proceeds, fee);
@@ -316,9 +380,65 @@ contract Escrow is IEscrow, Initializable, ReentrancyGuardTransient {
         _disarm();
 
         // The buyer is repaid in full; the asset never moved.
-        IERC20(terms.paymentToken).safeTransfer(terms.buyer, deposited);
+        _payout(IERC20(terms.paymentToken), terms.buyer, deposited);
 
         emit EscrowRefunded(escrowId, terms.buyer, deposited);
+    }
+
+    /// @notice Pays `to`, deferring the amount if the transfer cannot be delivered.
+    /// @dev Uses a raw `call` rather than `SafeERC20` deliberately, on the two paths
+    ///      where a failed transfer would otherwise be unrecoverable:
+    ///
+    ///      - **the buyer's refund**, which is the protocol's last resort. A blacklisted
+    ///        buyer would otherwise make `_refund` revert forever, and every other exit
+    ///        from `FUNDED` and `DISPUTED` already routes here;
+    ///      - **the protocol fee**, so one blacklisted treasury cannot halt settlement
+    ///        across every live trade until a timelocked treasury change lands.
+    ///
+    ///      It is deliberately **not** used for the seller's proceeds: that path has a
+    ///      downstream fallback (revert, then timeout refund), and deferring it would
+    ///      transfer the aircraft against an IOU.
+    ///
+    ///      Effects are already terminal by the time this runs, and the deferred
+    ///      balance is credited before any further interaction, so the deferral path
+    ///      is itself checks-effects-interactions.
+    /// @param token The settlement token.
+    /// @param to The intended recipient.
+    /// @param amount The amount owed.
+    function _payout(IERC20 token, address to, uint256 amount) private {
+        if (amount == 0) {
+            return;
+        }
+
+        (bool ok, bytes memory data) = address(token).call(abi.encodeCall(IERC20.transfer, (to, amount)));
+        // Mirrors SafeERC20's acceptance rule: a call that reverts fails, and a call
+        // returning data must return exactly `true`. Tokens returning nothing pass.
+        if (ok && (data.length == 0 || abi.decode(data, (bool)))) {
+            return;
+        }
+
+        withdrawable[to] += amount;
+        totalDeferred += amount;
+
+        emit PayoutDeferred(to, amount);
+    }
+
+    /// @inheritdoc IEscrow
+    function withdraw(address account) external nonReentrant {
+        uint256 amount = withdrawable[account];
+        if (amount == 0) {
+            revert NothingToWithdraw(account);
+        }
+
+        // Effects before the interaction: a token that reenters finds a zero balance.
+        withdrawable[account] = 0;
+        totalDeferred -= amount;
+
+        // `SafeERC20` here, not the tolerant path: a claim that cannot be delivered
+        // must revert and leave the balance intact rather than silently consume it.
+        IERC20(_terms.paymentToken).safeTransfer(account, amount);
+
+        emit PayoutWithdrawn(account, amount);
     }
 
     /// @notice Writes a status change and emits its event.

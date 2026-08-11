@@ -115,6 +115,23 @@ contract AssetOwnership is ProtocolModuleUpgradeable, IAssetOwnership {
         emit TransferFrozen(assetId);
     }
 
+    /// @inheritdoc IAssetOwnership
+    /// @dev Pause-gated, unlike its counterpart: unfreezing *expands* what can be done
+    ///      with an asset, so it must not run during an incident.
+    ///
+    ///      `AssetRegistry` is the only caller and reaches this on exactly two paths —
+    ///      an owner returning a `RETIRED` asset to service, and a timelocked admin
+    ///      correcting an erroneous terminal status. Keeping the entry point here
+    ///      registry-only preserves `INV-OWN-06`: the frozen bit is written only where
+    ///      the status it mirrors is written.
+    function unfreezeTransfers(uint256 assetId) external whenNotPaused onlyAssetRegistry {
+        OwnershipRecord storage record = _requireExists(assetId);
+
+        record.transferFrozen = false;
+
+        emit TransferUnfrozen(assetId);
+    }
+
     /*//////////////////////////////////////////////////////////////
                              DIRECT TRANSFER
     //////////////////////////////////////////////////////////////*/

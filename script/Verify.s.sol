@@ -32,6 +32,7 @@ contract Verify is DeploymentBase {
         _verifyAddressBook(a);
         _verifyAdminHandover(a);
         _verifyMachineRoles(a);
+        _verifyOperationalRoles(a);
         _verifyFees(a, expectedSettlementToken);
     }
 
@@ -121,6 +122,51 @@ contract Verify is DeploymentBase {
             EscrowFactory(a.escrowFactory).ESCROW_IMPLEMENTATION() == a.escrowImplementation,
             "factory points at the wrong escrow implementation"
         );
+    }
+
+    /// @notice Operational keys are held appropriately and duties are separated.
+    /// @dev The machine roles were already constrained above. These are the human-held
+    ///      keys, and they were previously unchecked entirely — a deployment could pass
+    ///      verification with one EOA holding the whole trust chain. `ARBITRATOR_ROLE`
+    ///      matters most: it is the only account that can resolve a disputed escrow.
+    /// @param a The deployed protocol addresses.
+    function _verifyOperationalRoles(ProtocolAddresses memory a) private view {
+        RoleManager roles = RoleManager(a.roleManager);
+
+        uint256 arbitrators = roles.getRoleMemberCount(ProtocolRoles.ARBITRATOR_ROLE);
+        _expect(arbitrators != 0, "no arbitrator configured");
+        for (uint256 i; i < arbitrators; ++i) {
+            // A single EOA deciding every dispute is one phished key away from
+            // controlling the outcome of every trade. Require a contract, so the
+            // holder is a multisig rather than a person.
+            _expect(roles.getRoleMember(ProtocolRoles.ARBITRATOR_ROLE, i).code.length != 0, "arbitrator is an EOA");
+        }
+
+        // Separation of duties. Verifying an organization, issuing its credentials and
+        // arbitrating its disputes are the three links of the trust chain; one key
+        // holding two of them collapses it. These are separate `.env` entries that a
+        // hurried operator can easily fill identically.
+        _expectDisjoint(roles, ProtocolRoles.ORG_VERIFIER_ROLE, ProtocolRoles.CREDENTIAL_ISSUER_ROLE);
+        _expectDisjoint(roles, ProtocolRoles.ORG_VERIFIER_ROLE, ProtocolRoles.ARBITRATOR_ROLE);
+        _expectDisjoint(roles, ProtocolRoles.CREDENTIAL_ISSUER_ROLE, ProtocolRoles.ARBITRATOR_ROLE);
+        _expectDisjoint(roles, ProtocolRoles.PAUSER_ROLE, ProtocolRoles.ARBITRATOR_ROLE);
+
+        // Fee configuration must sit behind the timelock, not with a leftover deployer.
+        _expect(roles.getRoleMemberCount(ProtocolRoles.FEE_MANAGER_ROLE) == 1, "fee manager role has extra holders");
+        _expect(roles.hasRole(ProtocolRoles.FEE_MANAGER_ROLE, a.protocolTimelock), "fee manager is not the timelock");
+    }
+
+    /// @notice Asserts no account holds both roles.
+    /// @dev Bounded by the number of holders of `roleA`, which deployment keeps small;
+    ///      this runs off-chain in a script, never on a user path.
+    /// @param roles The role manager.
+    /// @param roleA The first role.
+    /// @param roleB The second role.
+    function _expectDisjoint(RoleManager roles, bytes32 roleA, bytes32 roleB) private view {
+        uint256 count = roles.getRoleMemberCount(roleA);
+        for (uint256 i; i < count; ++i) {
+            _expect(!roles.hasRole(roleB, roles.getRoleMember(roleA, i)), "two trust-chain roles share a key");
+        }
     }
 
     /// @notice Fee parameters are within bounds and the treasury is set.

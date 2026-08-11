@@ -129,3 +129,51 @@ contract ReentrantToken is ERC20 {
         }
     }
 }
+
+/// @title BlacklistingToken
+/// @author AeroAsset Protocol
+/// @notice A token that reverts on transfers to or from a blocked account.
+/// @dev Models USDC, which is the protocol's intended settlement token and implements
+///      an administrative blacklist. This is the case that motivated audit finding
+///      AAP-13: an unconditional push to a blocked recipient reverts the whole
+///      settlement, so a party that cannot receive could otherwise make the escrow's
+///      terminal transition permanently impossible.
+contract BlacklistingToken is ERC20 {
+    /// @notice Thrown when a blocked account is party to a transfer.
+    /// @param account The blocked account.
+    error Blacklisted(address account);
+
+    /// @notice Accounts that can neither send nor receive.
+    mapping(address account => bool blocked) public blocked;
+
+    /// @notice Deploys the token.
+    constructor() ERC20("Blacklisting USD", "bUSD") {}
+
+    /// @notice Mints tokens to an account.
+    /// @param to The recipient.
+    /// @param amount The amount to mint.
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+
+    /// @notice Blocks or unblocks an account.
+    /// @param account The account to change.
+    /// @param isBlocked True to block.
+    function setBlocked(address account, bool isBlocked) external {
+        blocked[account] = isBlocked;
+    }
+
+    /// @notice Reverts if either party to a transfer is blocked.
+    /// @param from The sender, or zero when minting.
+    /// @param to The recipient, or zero when burning.
+    /// @param value The amount moved.
+    function _update(address from, address to, uint256 value) internal override {
+        if (blocked[from]) {
+            revert Blacklisted(from);
+        }
+        if (blocked[to]) {
+            revert Blacklisted(to);
+        }
+        super._update(from, to, value);
+    }
+}

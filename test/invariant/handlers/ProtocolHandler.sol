@@ -599,6 +599,26 @@ contract ProtocolHandler is CommonBase, StdCheats, StdUtils {
         } catch {}
     }
 
+    /// @notice Refunds a disputed escrow whose arbitration window has lapsed.
+    /// @dev Audit AAP-01. Included so the fuzzer can drive a dispute to expiry and the
+    ///      conservation invariants cover the exit that makes `DISPUTED` non-absorbing.
+    /// @param escrowSeed Selects the escrow.
+    function claimDisputeTimeout(uint256 escrowSeed) external {
+        address escrow = _anyEscrow(escrowSeed);
+        if (escrow == address(0)) {
+            return;
+        }
+
+        IEscrow e = IEscrow(escrow);
+        uint256 deposited = e.depositedAmount();
+
+        try e.claimDisputeTimeout() {
+            ghostPaidOut += deposited;
+            callsOf["claimDisputeTimeout"] += 1;
+            totalCalls += 1;
+        } catch {}
+    }
+
     /// @notice Advances the clock so deadlines can actually elapse.
     /// @param secondsSeed How far to jump.
     function warpTime(uint256 secondsSeed) external {

@@ -78,9 +78,17 @@ interface IAssetOwnership {
     /// @param by The account that changed the lock.
     event TransferLockChanged(uint256 indexed assetId, address indexed lockedBy, address indexed by);
 
-    /// @notice Emitted when an asset's transferability is permanently frozen.
+    /// @notice Emitted when an asset's transferability is frozen.
+    /// @dev Mirrors a terminal status in `AssetRegistry` (`INV-OWN-06`).
     /// @param assetId The asset id.
     event TransferFrozen(uint256 indexed assetId);
+
+    /// @notice Emitted when a frozen asset is returned to a transferable state.
+    /// @dev Reachable only through `AssetRegistry`, either when an owner returns a
+    ///      `RETIRED` asset to service or when a timelocked admin corrects an
+    ///      erroneous terminal status.
+    /// @param assetId The asset id.
+    event TransferUnfrozen(uint256 indexed assetId);
 
     /*//////////////////////////////////////////////////////////////
                                   ERRORS
@@ -164,19 +172,25 @@ interface IAssetOwnership {
     /// @param owner The initial owner. Must be non-zero.
     function initializeOwnership(uint256 assetId, address owner) external;
 
-    /// @notice Permanently freezes an asset's transferability.
+    /// @notice Freezes an asset's transferability.
     /// @dev Callable **only** by the address registered as `ASSET_REGISTRY`, which
     ///      calls it in the same transaction as the terminal status change that caused
     ///      it. The mirror exists so this module never reads upward into
     ///      `AssetRegistry`.
-    ///
-    ///      There is deliberately no unfreeze. Terminal asset statuses are absorbing
-    ///      (`INV-ASSET-04`), so an unfreeze path could never be reached from
-    ///      `AssetRegistry` — it would be untestable code on a security-relevant
-    ///      module. If retirement ever becomes reversible, this is reintroduced as an
-    ///      explicit upgrade rather than sitting dormant.
     /// @param assetId The asset id.
     function freezeTransfers(uint256 assetId) external;
+
+    /// @notice Returns a frozen asset to a transferable state.
+    /// @dev Callable **only** by `ASSET_REGISTRY`, in the same transaction as the
+    ///      status change that justifies it, so the mirror cannot drift.
+    ///
+    ///      This exists because an irreversible freeze reachable by one unprivileged
+    ///      transaction is a larger risk than a recoverable one. `RETIRED` is a
+    ///      reversible real-world state — stored airframes return to service — and an
+    ///      erroneous `DESTROYED` would otherwise permanently orphan an asset's entire
+    ///      provenance chain with no recourse for anyone, including the timelock.
+    /// @param assetId The asset id.
+    function unfreezeTransfers(uint256 assetId) external;
 
     /*//////////////////////////////////////////////////////////////
                              DIRECT TRANSFER

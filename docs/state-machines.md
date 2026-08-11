@@ -129,13 +129,35 @@ indexed.
          └───────┴──────────┬────────────────┘
                             ▼
               ┌─────────┐       ┌───────────┐
-              │ RETIRED │       │ DESTROYED │   (both terminal)
-              └─────────┘       └───────────┘
+              │ RETIRED │       │ DESTROYED │
+              └────┬────┘       └───────────┘
+                   │             (absorbing for the owner)
+                   └──▶ back to any operational status
 ```
 
 Operational statuses (`REGISTERED`, `IN_SERVICE`, `STORED`, `UNDER_MAINTENANCE`) are
-mutually reachable. Terminal statuses are reachable from any operational status and
-have no exit.
+mutually reachable. Both terminal statuses freeze transferability in `AssetOwnership`
+(`INV-OWN-06`), but they differ in whether they can be left:
+
+- **`RETIRED` is reversible.** The owner may return the asset to any operational status,
+  which unfreezes it in the same transaction. Retirement is a reversible real-world
+  state — stored airframes are routinely returned to service — and modelling it as
+  absorbing meant a returning aircraft had to be re-registered under a new id, orphaning
+  its entire document and maintenance provenance. It may **not** hop directly to
+  `DESTROYED`; that requires passing back through an operational status.
+- **`DESTROYED` is absorbing** for every owner-initiated transition.
+
+**Entering a terminal status is refused while an escrow holds the asset's transfer
+lock** (`AssetLockedBySettlement`). Otherwise a seller could freeze an aircraft after the
+buyer had funded, making that trade permanently unsettleable — see audit finding AAP-02.
+A genuine mid-trade loss is a dispute for the arbitrator, not a unilateral write.
+
+**Recovery.** `recoverTerminalAsset(assetId, newStatus)` restores a terminal asset to an
+operational status and unfreezes it. It is restricted to `PROTOCOL_ADMIN_ROLE`, so every
+use is queued behind the timelock delay and publicly visible before it lands, and it
+cannot move between terminal statuses. It exists because an irreversible state reachable
+by one unprivileged transaction — a fat-fingered `DESTROYED` on a $100M airframe — would
+otherwise have no recourse available to anyone (AAP-03).
 
 **Verification is an orthogonal axis, not a status** (see `asset-model.md` §2.2):
 
@@ -145,7 +167,8 @@ have no exit.
 ```
 
 `registerAsset` must never set `verifiedAt` (roadmap §7, `INV-ASSET-03`).
-A `RETIRED` or `DESTROYED` asset cannot be verified, listed, or transferred.
+A `RETIRED` or `DESTROYED` asset cannot be verified, listed, or transferred while it
+holds that status.
 
 ---
 
@@ -307,6 +330,19 @@ by an unaccepted offer, so nothing is at risk while one sits idle.
 | `FUNDED` → `DISPUTED` | buyer or seller, before `settlementDeadline` | funds frozen |
 | `FUNDED` → `REFUNDED` | anyone, after `settlementDeadline` | buyer repaid in full, asset unmoved |
 | `DISPUTED` → `RELEASED`\|`REFUNDED` | `ARBITRATOR_ROLE` | exactly one of the two |
+| `DISPUTED` → `REFUNDED` | anyone, after `DISPUTE_RESOLUTION_WINDOW` (14d) | buyer repaid in full, asset unmoved |
+
+**Every non-terminal state is bounded by a deadline after which a permissionless call
+reaches a terminal state.** `AWAITING_FUNDING` by `fundingDeadline`, `FUNDED` by
+`settlementDeadline`, and `DISPUTED` by `DISPUTE_RESOLUTION_WINDOW`, measured from the
+moment the dispute is raised.
+
+The last of these closes audit finding AAP-01. Without it, `DISPUTED` had no exit that
+did not depend on a third party choosing to act: either party could freeze the
+counterparty's entire deposit indefinitely for the cost of one transaction, and a lost or
+unresponsive arbitrator key would strand every disputed trade permanently. Refund-by-
+default also removes the incentive — a party who disputes to stall now only delays a
+refund they were never able to prevent.
 
 `SETTLEMENT_ROLE` is revoked from the clone on entry to **any** terminal state, so an
 escrow's ability to move an aircraft exists only for the window in which it is live.

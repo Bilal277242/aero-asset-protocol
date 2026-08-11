@@ -546,6 +546,38 @@ abstract contract ProtocolTestBase is BaseTest {
         (, escrow) = marketplace.acceptOffer(offerId);
     }
 
+    /// @notice Opens a trade denominated in a specific settlement token.
+    /// @dev Allowlists the token first. Used by suites that need a non-conforming or
+    ///      adversarial token in the settlement path.
+    /// @param token The settlement token to allowlist and price the listing in.
+    /// @param price Gross asking price.
+    /// @return assetId The listed aircraft.
+    /// @return listingId The listing id.
+    /// @return escrow The opened escrow clone.
+    function _openTradeWithToken(address token, uint128 price)
+        internal
+        returns (uint256 assetId, uint256 listingId, address escrow)
+    {
+        vm.prank(protocolAdmin);
+        feeManager.setTokenAllowed(token, true);
+
+        uint256 orgId = _registerVerifiedOrg(
+            alice, keccak256(abi.encode("org", token)), IOrganizationRegistry.OrganizationType.AIRLINE
+        );
+        assetId = _registerAircraft(orgId, alice, alice, keccak256(abi.encode("MSN", token)));
+
+        vm.prank(orgVerifier);
+        assetRegistry.verifyAsset(assetId, orgId);
+
+        vm.prank(alice);
+        listingId = marketplace.createListing(assetId, token, price, uint40(block.timestamp + 300 days));
+
+        vm.prank(bob);
+        uint256 offerId = marketplace.makeOffer(listingId, price, uint40(block.timestamp + 7 days));
+        vm.prank(alice);
+        (, escrow) = marketplace.acceptOffer(offerId);
+    }
+
     /// @notice Registers a verified MRO holding a valid maintenance-authority credential.
     /// @return orgId The MRO organization id.
     /// @return credentialId The maintenance-authority credential id.

@@ -354,36 +354,6 @@ contract EscrowSecurityTest is ProtocolTestBase {
                                  HELPERS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Opens a trade priced in an arbitrary token, allowlisting it first.
-    /// @param token The settlement token to use.
-    /// @param price Gross asking price.
-    /// @return assetId The listed aircraft.
-    /// @return listingId The listing id.
-    /// @return escrow The opened escrow clone.
-    function _openTradeWithToken(address token, uint128 price)
-        internal
-        returns (uint256 assetId, uint256 listingId, address escrow)
-    {
-        vm.prank(protocolAdmin);
-        feeManager.setTokenAllowed(token, true);
-
-        uint256 orgId = _registerVerifiedOrg(
-            alice, keccak256(abi.encode("org", token)), IOrganizationRegistry.OrganizationType.AIRLINE
-        );
-        assetId = _registerAircraft(orgId, alice, alice, keccak256(abi.encode("MSN", token)));
-
-        vm.prank(orgVerifier);
-        assetRegistry.verifyAsset(assetId, orgId);
-
-        vm.prank(alice);
-        listingId = marketplace.createListing(assetId, token, price, uint40(block.timestamp + 300 days));
-
-        vm.prank(bob);
-        uint256 offerId = marketplace.makeOffer(listingId, price, uint40(block.timestamp + 7 days));
-        vm.prank(alice);
-        (, escrow) = marketplace.acceptOffer(offerId);
-    }
-
     /// @notice Builds a syntactically valid terms struct for direct factory calls.
     /// @dev Only used to prove the caller gate rejects it before any of it matters.
     /// @return The assembled terms.

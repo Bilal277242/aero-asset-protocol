@@ -61,6 +61,12 @@ abstract contract BaseTest is Test {
         credentialIssuer = _actor("credentialIssuer");
         mro = _actor("mro");
         arbitrator = _actor("arbitrator");
+        // Audit AAP-04: production requires `ARBITRATOR_ROLE` to be a multisig rather
+        // than a single key, and `Verify.s.sol` enforces it by asserting the holder has
+        // code. Give the fixture code so tests exercise a compliant configuration.
+        // `vm.prank` is unaffected by the callee having a body.
+        vm.etch(arbitrator, hex"00");
+
         treasury = _actor("treasury");
 
         alice = _actor("alice");
