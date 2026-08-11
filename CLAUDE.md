@@ -100,4 +100,5 @@ valuation, DeFi yield, decentralized arbitration, on-chain document storage.
 | 6 | `FeeManager`, `Marketplace` | ✅ complete |
 | 7 | `EscrowFactory`, `Escrow`, disputes | ✅ complete |
 | 8 | Invariants, fuzz, static analysis, gas | ✅ complete |
-| 9 | Deployment scripts, Sepolia, E2E | ⬜ |
+| 9 | Deployment scripts, local E2E | ✅ complete |
+| 9b | Sepolia deploy + verify | ⬜ needs RPC + funded key |

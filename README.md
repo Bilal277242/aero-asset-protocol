@@ -4,10 +4,10 @@ Blockchain infrastructure for aviation assets — a verified asset registry, dig
 asset passport, maintenance and document proofs, ownership tracking, marketplace and
 escrow.
 
-> **Status: Phase 8 complete** — all five layers are implemented and tested, and the
-> protocol invariants are executable rather than aspirational: a handler-driven suite
-> asserts 18 of them after every step of randomized action sequences. Remaining:
-> deployment scripts and a Sepolia end-to-end run, then an independent audit. This is
+> **Status: Phase 9 complete** — all five layers are implemented and tested, the 18
+> protocol invariants are executable rather than aspirational, and the protocol deploys
+> from staged scripts into a timelock-governed configuration that a verification script
+> asserts on-chain. Remaining: a live testnet run, then an independent audit. This is
 > not audited software and must not be used with real funds.
 
 ---
@@ -72,7 +72,39 @@ Other useful commands:
 forge fmt && forge test -vvv && forge snapshot && forge coverage --no-match-coverage "(test|script)/" --report summary
 ```
 
-Deployment (Phase 9) uses staged scripts; copy `.env.example` to `.env` first.
+---
+
+## Deployment
+
+Copy `.env.example` to `.env` and fill it in first. `.env` is git-ignored and must never
+be committed.
+
+Deployment is staged rather than monolithic: each script deploys one layer, writes its
+addresses to `deployments/<chainId>.json`, and reads the previous stages back from disk.
+A stage that reverts halfway can be re-run without redeploying the layers beneath it.
+
+```bash
+forge script script/DeployCore.s.sol --rpc-url sepolia --account deployer --broadcast --verify
+```
+
+Then in order: `DeployIdentity`, `DeployAssets`, `DeployProvenance`, `DeployMarketplace`,
+`DeployEscrow`, `ConfigureProtocol`, and finally:
+
+```bash
+forge script script/Verify.s.sol --rpc-url sepolia
+```
+
+`ConfigureProtocol` ends by granting every admin role to `ProtocolTimelock` and
+renouncing the deployer's own — after that step the deployer EOA has no power over the
+protocol, and every further change must go through the timelock's ≥48h delay.
+`Verify.s.sol` asserts that handover actually happened, along with every address-book
+entry, machine-role grant and fee bound. **Deployment is not complete until `Verify`
+passes**; a forgotten role grant is indistinguishable from a working deployment until
+the first settlement fails with real funds in escrow.
+
+`test/integration/FullLifecycle.t.sol` runs the entire sequence in-process — deploy,
+configure, hand over, verify, then a full aircraft sale through escrow — so the scripts
+are covered by CI rather than only exercised on a live chain.
 
 ---
 
@@ -122,7 +154,8 @@ Deployment (Phase 9) uses staged scripts; copy `.env.example` to `.env` first.
 | 6 | `FeeManager` + `Marketplace` | ✅ |
 | 7 | Escrow + disputes | ✅ |
 | 8 | Invariants, fuzz, static analysis, gas | ✅ |
-| 9 | Deployment + Sepolia E2E | ⬜ |
+| 9 | Deployment scripts + local E2E | ✅ |
+| 9b | Sepolia deploy + verify | ⬜ needs your RPC + funded key |
 
 Post-V1: independent security audit, multisig key custody, monitoring, mainnet.
 **AI-generated Solidity is not automatically secure** — an independent human audit is a
