@@ -266,6 +266,20 @@ marketplace error. Cosmetic.
 
 No findings beyond the cosmetic note.
 
+## 12b. Static analysis (added post-remediation)
+
+At the time of the audit, Slither had never run — see AAP-24. It has since been executed:
+**76 contracts, 100 detectors, 46 findings, zero High.** Nothing in this review's
+conclusions changed as a result, and no finding it surfaced was absent from the manual
+review. The four Medium findings were triaged as three `incorrect-equality` false
+positives on `== 0` sentinels and one unexploitable `reentrancy-no-eth` in `acceptOffer`.
+CI is now blocking at `fail-on: medium`. Full detail in `docs/audit/slither-triage.md`.
+
+The honest read on that: automated analysis confirmed the manual review rather than
+extending it, which is the expected outcome for the bug classes Slither covers — and is
+precisely why it is not a substitute for adversarial human review of the *design*
+issues (AAP-01 through AAP-04), none of which any static analyzer would have flagged.
+
 ## 13. Testing posture as evidence
 
 488 tests pass; coverage is 99.60% line / 97.92% branch on `src/`. The invariant suite

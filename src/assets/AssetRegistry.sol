@@ -223,6 +223,36 @@ contract AssetRegistry is ProtocolModuleUpgradeable, IAssetRegistry {
         emit AssetVerificationChanged(assetId, previousVerifier, false, msg.sender);
     }
 
+    /// @inheritdoc IAssetRegistry
+    /// @dev Restricted to `PROTOCOL_ADMIN_ROLE`, so every use is queued behind the
+    ///      timelock and publicly visible before it lands.
+    ///
+    ///      Serial-number commitments are permissionless to claim and were permanent,
+    ///      which let anyone pre-register the hash of a real aircraft's MSN and block
+    ///      its true owner forever — aviation serials are public and short, so the
+    ///      preimages are trivially computable (audit AAP-08). This is the adjudication
+    ///      path for a squatted or mistaken claim.
+    function releaseSerialNumberHash(uint256 assetId) external onlyRole(ProtocolRoles.PROTOCOL_ADMIN_ROLE) {
+        Asset storage asset = _requireExists(assetId);
+        bytes32 serialHash = asset.serialNumberHash;
+
+        if (serialHash == bytes32(0)) {
+            revert NoSerialNumberRecorded(assetId);
+        }
+
+        AssetRegistryStorage storage $ = _s();
+        if ($.assetIdBySerialHash[serialHash] != assetId) {
+            revert SerialNumberNotHeld(assetId, serialHash);
+        }
+
+        // The index entry is freed and the asset's own claim to it withdrawn, so the
+        // released record cannot keep asserting a serial another asset now holds.
+        delete $.assetIdBySerialHash[serialHash];
+        asset.serialNumberHash = bytes32(0);
+
+        emit SerialNumberHashReleased(assetId, serialHash, msg.sender);
+    }
+
     /*//////////////////////////////////////////////////////////////
                                   VIEWS
     //////////////////////////////////////////////////////////////*/

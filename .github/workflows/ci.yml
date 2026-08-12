@@ -81,9 +81,16 @@ jobs:
         with:
           version: stable
 
+      # Blocking as of the Gate 1 audit remediation. The baseline is clean at this
+      # threshold: 42 findings remain, all Low or Informational, and each class is
+      # accounted for in docs/audit/slither-triage.md. The four Medium findings that
+      # existed are suppressed at their source with `slither-disable-next-line` and a
+      # written justification, so a *new* Medium anywhere fails the build rather than
+      # being lost in the noise.
+      #
+      # Do not restore continue-on-error to silence a new finding. Triage it.
       - name: Run Slither
         uses: crytic/slither-action@v0.4.0
-        continue-on-error: true
         with:
           fail-on: medium
           slither-args: --filter-paths "lib/|test/|script/"

@@ -91,6 +91,13 @@ interface IOrganizationRegistry {
     /// @param metadataURI The new off-chain profile location.
     event OrganizationUpdated(uint256 indexed orgId, bytes32 metadataHash, string metadataURI);
 
+    /// @notice Emitted when revocation frees a name hash for re-registration.
+    /// @dev The revoked record itself is retained as an audit trail; only the
+    ///      uniqueness index entry is released.
+    /// @param orgId The revoked organization.
+    /// @param nameHash The name commitment now available again.
+    event OrganizationNameReleased(uint256 indexed orgId, bytes32 indexed nameHash);
+
     /// @notice Emitted on every organization lifecycle transition.
     /// @param orgId The organization id.
     /// @param oldStatus The status before the transition.

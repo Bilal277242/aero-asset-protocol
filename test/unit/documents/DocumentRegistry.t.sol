@@ -54,7 +54,7 @@ contract DocumentRegistryTest is ProtocolTestBase {
 
         assertEq(documentRegistry.documentURI(documentId), "ipfs://doc", "wrong uri");
         assertEq(documentRegistry.documentCountOf(assetId), 1, "not indexed against the asset");
-        assertEq(documentRegistry.documentIdByHash(DOC_HASH), documentId, "hash index missing");
+        assertEq(documentRegistry.documentIdOf(assetId, DOC_HASH), documentId, "hash index missing");
     }
 
     /// @notice An organization can register a document attributed to itself.

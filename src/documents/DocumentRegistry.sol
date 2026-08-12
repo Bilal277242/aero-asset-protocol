@@ -46,8 +46,15 @@ contract DocumentRegistry is ProtocolModuleUpgradeable, IDocumentRegistry {
     /// @param documentCount Highest minted document id. Ids are dense from 1.
     /// @param documents Document records by id.
     /// @param documentURI Off-chain locations, kept out of the packed struct.
-    /// @param documentIdByHash Reverse index enforcing commitment uniqueness.
+    /// @param documentIdByHash **Deprecated and no longer written.** Retained so the
+    ///        ERC-7201 layout stays append-only across the upgrade that replaced it;
+    ///        see {documentIdByAssetAndHash}.
     /// @param assetDocuments Per-asset document index. View-read only.
+    /// @param documentIdByAssetAndHash Reverse index enforcing commitment uniqueness
+    ///        **per asset**. Global uniqueness (audit AAP-07) let anyone permanently
+    ///        burn a hash against a junk asset they controlled, and could not represent
+    ///        a document that legitimately applies to more than one aircraft — an
+    ///        Airworthiness Directive covers a fleet.
     /// @custom:storage-location erc7201:aeroasset.storage.DocumentRegistry
     struct DocumentRegistryStorage {
         uint256 documentCount;
@@ -55,6 +62,7 @@ contract DocumentRegistry is ProtocolModuleUpgradeable, IDocumentRegistry {
         mapping(uint256 documentId => string) documentURI;
         mapping(bytes32 documentHash => uint256 documentId) documentIdByHash;
         mapping(uint256 assetId => uint256[]) assetDocuments;
+        mapping(uint256 assetId => mapping(bytes32 documentHash => uint256 documentId)) documentIdByAssetAndHash;
     }
 
     /// @dev `keccak256(abi.encode(uint256(keccak256("aeroasset.storage.DocumentRegistry")) - 1))
@@ -98,7 +106,10 @@ contract DocumentRegistry is ProtocolModuleUpgradeable, IDocumentRegistry {
 
         DocumentRegistryStorage storage $ = _s();
 
-        uint256 existing = $.documentIdByHash[documentHash];
+        // Scoped to the asset, not global: the real property is "no duplicate document
+        // on the same asset", and enforcing it protocol-wide handed anyone a permanent
+        // cross-asset denial of service (audit AAP-07).
+        uint256 existing = $.documentIdByAssetAndHash[assetId][documentHash];
         if (existing != 0) {
             revert DocumentHashTaken(documentHash, existing);
         }
@@ -121,7 +132,7 @@ contract DocumentRegistry is ProtocolModuleUpgradeable, IDocumentRegistry {
             documentHash: documentHash
         });
         $.documentURI[documentId] = uri;
-        $.documentIdByHash[documentHash] = documentId;
+        $.documentIdByAssetAndHash[assetId][documentHash] = documentId;
         $.assetDocuments[assetId].push(documentId);
 
         emit DocumentRegistered(documentId, assetId, issuerOrgId, docType, documentHash, uri);
@@ -186,8 +197,8 @@ contract DocumentRegistry is ProtocolModuleUpgradeable, IDocumentRegistry {
     }
 
     /// @inheritdoc IDocumentRegistry
-    function documentIdByHash(bytes32 documentHash) external view returns (uint256) {
-        return _s().documentIdByHash[documentHash];
+    function documentIdOf(uint256 assetId, bytes32 documentHash) external view returns (uint256) {
+        return _s().documentIdByAssetAndHash[assetId][documentHash];
     }
 
     /// @inheritdoc IDocumentRegistry

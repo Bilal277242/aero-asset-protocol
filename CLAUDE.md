@@ -101,4 +101,24 @@ valuation, DeFi yield, decentralized arbitration, on-chain document storage.
 | 7 | `EscrowFactory`, `Escrow`, disputes | ✅ complete |
 | 8 | Invariants, fuzz, static analysis, gas | ✅ complete |
 | 9 | Deployment scripts, local E2E | ✅ complete |
+| 10 | Internal audit (`audit/`) — 26 findings raised, 25 valid | ✅ complete |
+| 10a | Gate 0 remediation — permanent fund/state loss | ✅ complete |
+| 10b | Gate 1 remediation — identifier burns, `via_ir`, Slither | ✅ complete |
+| 10c | Gate 2 remediation — economic + data integrity | ⬜ AAP-09, 11, 12, 15, 17, 18 |
+| 10d | Gate 3 remediation — housekeeping | ⬜ AAP-16, 19, 20, 21, 22, 23 |
 | 9b | Sepolia deploy + verify | ⬜ needs RPC + funded key |
+
+## Audit
+
+`audit/findings.md` is the finding catalogue and the source of truth for remediation
+status. Regression tests for every fixed finding live in `test/audit/` and run in CI —
+if one fails, that vulnerability is back.
+
+Static analysis is **blocking**: `slither . --config-file slither.config.json
+--fail-medium` must exit 0. Suppress at the source with `slither-disable-next-line` and a
+written justification, never by excluding a detector in config. See
+`docs/audit/slither-triage.md`.
+
+**This is not a substitute for an independent human audit**, which remains a hard gate
+before the protocol handles meaningful funds. The internal audit was performed by the
+same agent that wrote the code.

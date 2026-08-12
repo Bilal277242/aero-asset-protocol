@@ -30,21 +30,46 @@ differently, and may find whole classes of issue I am blind to.
 
 ## Remediation status
 
-**Gate 0 is complete** as of commit following `b31b6d2`. AAP-01, AAP-02, AAP-03, AAP-04
-and AAP-13 are fixed, with 13 regression tests in `test/audit/Gate0Regression.t.sol`
-running in CI. Gate 1 and below are outstanding.
+**Gates 0 and 1 are complete.** Thirteen findings are fixed, with 25 regression tests
+across `test/audit/Gate0Regression.t.sol` and `Gate1Regression.t.sol` running in CI.
+Gates 2 and 3 remain outstanding; none of their findings can strand value.
 
 | Gate | Findings | Status |
 |---|---|---|
 | 0 | AAP-01, AAP-02, AAP-03, AAP-04, AAP-13 | ✅ **remediated** |
-| 1 | AAP-05, AAP-06, AAP-07, AAP-08, AAP-10, AAP-14 (partial), AAP-24, AAP-26 | ⬜ open |
+| 1 | AAP-05, AAP-06, AAP-07, AAP-08, AAP-10, AAP-14, AAP-24, AAP-25 | ✅ **remediated** |
 | 2 | AAP-09, AAP-11, AAP-12, AAP-15, AAP-17, AAP-18 | ⬜ open |
-| 3 | AAP-16, AAP-19, AAP-20, AAP-21, AAP-22, AAP-23, AAP-25 | ⬜ open |
+| 3 | AAP-16, AAP-19, AAP-20, AAP-21, AAP-22, AAP-23 | ⬜ open |
+| — | **AAP-26** | ❌ **withdrawn — false positive** |
 
-AAP-14 was partially addressed in the Gate 0 pass: `Verify.s.sol` now asserts the
-arbitrator set is non-empty and all-contracts, enforces separation of duties across the
-verifier/issuer/arbitrator/pauser keys, and pins `FEE_MANAGER_ROLE` to the timelock. The
-remaining item is splitting `ASSET_VERIFIER_ROLE` from `ORG_VERIFIER_ROLE` (AAP-25).
+### AAP-26 was wrong
+
+I reported the OpenZeppelin submodule as pinned to an untagged commit. It is not: the
+pin is exactly `v5.4.0`.
+
+```
+tag v5.4.0: c64a1edb67b6e3f4a15cca8909c9482ad33a02b0
+HEAD:       c64a1edb67b6e3f4a15cca8909c9482ad33a02b0
+```
+
+`v5.4.0` is a **lightweight** tag. `git describe` without `--tags` considers only
+annotated tags and therefore falls back to `v4.8.0-952-g…`, which is what
+`git submodule status` prints. I read that fallback as the pin itself. The dependency was
+correct the whole time; the finding was an artifact of how I checked it.
+
+### AAP-24 is now genuinely closed
+
+Slither had never executed against this codebase. It has now been run: 76 contracts, 100
+detectors, **46 findings, zero High**. The four Medium findings were triaged — three are
+`incorrect-equality` firing on `== 0` sentinels (false positives) and one is a real but
+unexploitable `reentrancy-no-eth` in `acceptOffer` where the written values are *returned
+by* the call that precedes them. All four are suppressed at the source with written
+justifications, so a new Medium anywhere fails the build. CI is now **blocking** at
+`fail-on: medium`. Full triage in `docs/audit/slither-triage.md`.
+
+AAP-14 was addressed across both gates: Gate 0 added the arbitrator, separation-of-duty
+and fee-manager assertions to `Verify.s.sol`; Gate 1 split `ASSET_VERIFIER_ROLE` from
+`ORG_VERIFIER_ROLE` in `ConfigureProtocol.Config` (AAP-25), which was the remaining item.
 
 **One deviation from the recommendation as written.** AAP-04 called for ≥2 arbitrator
 holders. The implemented check requires ≥1 holder and that *every* holder is a contract.
@@ -55,20 +80,28 @@ single point of failure is AAP-01's timeout fallback, which is implemented.
 
 ## Summary
 
-| Severity | Count | Fixed |
-|---|---|---|
-| CRITICAL | 1 | 1 |
-| HIGH | 3 | 3 |
-| MEDIUM | 10 | 1 |
-| LOW | 5 | 0 |
-| INFORMATIONAL | 7 | 0 |
-| **Total** | **26** | **5** |
+| Severity | Valid | Fixed | Open |
+|---|---|---|---|
+| CRITICAL | 1 | 1 | 0 |
+| HIGH | 3 | 3 | 0 |
+| MEDIUM | 10 | 7 | 3 |
+| LOW | 5 | 0 | 5 |
+| INFORMATIONAL | 6 | 2 | 4 |
+| **Total** | **25** | **13** | **12** |
+
+One further finding (AAP-26) was reported and later withdrawn as a false positive, so 26
+were raised and 25 stand.
+
+**Every CRITICAL, HIGH, and severity-MEDIUM finding that concerns permanent loss of
+funds or state is closed.** The three open MEDIUMs are AAP-09 (buyer's free option),
+AAP-11 (post-verification metadata mutation) and AAP-12 (unbounded maintenance
+backdating) — all economic or data-integrity issues, none of which can strand value.
 
 No finding permits an unprivileged attacker to **steal** funds. The most severe issues
 are **permanent freezing of funds and permanent destruction of asset state** by an
 ordinary counterparty, which the protocol's state machines allow by construction.
 
-A ✅ in the table marks a finding remediated in the Gate 0 pass.
+A ✅ marks a remediated finding.
 
 | ID | Severity | Title | Contract |
 |---|---|---|---|
@@ -76,16 +109,16 @@ A ✅ in the table marks a finding remediated in the Gate 0 pass.
 | AAP-02 | HIGH | ✅  Seller can brick the asset mid-escrow and strand the deposit | `AssetRegistry` / `Escrow` |
 | AAP-03 | HIGH | ✅  `transferFrozen` is irreversible protocol-wide, with no recovery path | `AssetOwnership` |
 | AAP-04 | HIGH | ✅  Single-EOA arbitrator is a single point of total failure for disputed funds | `RoleManager` / deployment |
-| AAP-05 | MEDIUM | Rejecting a squatted organization does not free its name hash | `OrganizationRegistry` |
-| AAP-06 | MEDIUM | An installed component can be sold off its airframe | `ComponentRegistry` / `Marketplace` |
-| AAP-07 | MEDIUM | Document-hash uniqueness is global and permanent — cross-asset DoS | `DocumentRegistry` |
-| AAP-08 | MEDIUM | Serial-number hash squatting permanently burns an identifier | `AssetRegistry` |
+| AAP-05 | MEDIUM | ✅ Rejecting a squatted organization does not free its name hash | `OrganizationRegistry` |
+| AAP-06 | MEDIUM | ✅ An installed component can be sold off its airframe | `ComponentRegistry` / `Marketplace` |
+| AAP-07 | MEDIUM | ✅ Document-hash uniqueness is global and permanent — cross-asset DoS | `DocumentRegistry` |
+| AAP-08 | MEDIUM | ✅ Serial-number hash squatting permanently burns an identifier | `AssetRegistry` |
 | AAP-09 | MEDIUM | Buyer holds a free 30-day option on the seller's asset | `Escrow` / `Marketplace` |
-| AAP-10 | MEDIUM | `via_ir` profile ships bytecode the test suite never exercised | `foundry.toml` |
+| AAP-10 | MEDIUM | ✅ `via_ir` profile ships bytecode the test suite never exercised | `foundry.toml` |
 | AAP-11 | MEDIUM | Verified organization can silently mutate its metadata | `OrganizationRegistry` |
 | AAP-12 | MEDIUM | Maintenance records can be backdated without bound | `MaintenanceRegistry` |
 | AAP-13 | MEDIUM | ✅  Blacklistable settlement token can permanently brick the refund path | `Escrow` |
-| AAP-14 | MEDIUM | `Verify.s.sol` does not constrain operational role holders | `script/Verify.s.sol` |
+| AAP-14 | MEDIUM | ✅ `Verify.s.sol` does not constrain operational role holders | `script/Verify.s.sol` |
 | AAP-15 | LOW | Treasury resolved at settlement, not captured at acceptance | `Escrow` / `FeeManager` |
 | AAP-16 | LOW | `fund()` performs an interaction before its effects, contradicting its NatSpec | `Escrow` |
 | AAP-17 | LOW | Revoked organization's admin retains operator and admin-transfer powers | `OrganizationRegistry` |
@@ -95,9 +128,9 @@ A ✅ in the table marks a finding remediated in the Gate 0 pass.
 | AAP-21 | INFORMATIONAL | Raw `uint40(block.timestamp)` casts bypass the `ProtocolCast` policy | multiple |
 | AAP-22 | INFORMATIONAL | `installComponent` makes four redundant external calls | `ComponentRegistry` |
 | AAP-23 | INFORMATIONAL | Event ordering in `settleTransfer` and `resolveDispute` | `AssetOwnership` / `Escrow` |
-| AAP-24 | INFORMATIONAL | Slither has never been executed against this codebase | process |
-| AAP-25 | INFORMATIONAL | `ORG_VERIFIER_ROLE` and `ASSET_VERIFIER_ROLE` collapse to one key | `ConfigureProtocol` |
-| AAP-26 | INFORMATIONAL | OpenZeppelin submodule pinned to an untagged commit | `.gitmodules` |
+| AAP-24 | INFORMATIONAL | ✅ Slither has never been executed against this codebase | process |
+| AAP-25 | INFORMATIONAL | ✅ `ORG_VERIFIER_ROLE` and `ASSET_VERIFIER_ROLE` collapse to one key | `ConfigureProtocol` |
+| AAP-26 | ~~INFO~~ | ❌ withdrawn — OpenZeppelin submodule pinned to an untagged commit | `.gitmodules` |
 
 ---
 

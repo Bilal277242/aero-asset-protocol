@@ -97,31 +97,38 @@ contract AssetPassport {
 
     /// @notice Returns the aggregated summary for an asset.
     /// @dev Reverts through `AssetRegistry` if the asset does not exist.
+    ///
+    ///      Assembled field by field rather than as one struct literal. A single
+    ///      17-field literal holds every value live at once, which overflows the EVM
+    ///      stack under the IR pipeline — `Variable _53 is 1 too deep in the stack`.
+    ///      Writing straight into the named return lets each value die immediately
+    ///      after its assignment. Identical output; purely a codegen concession.
     /// @param assetId The asset id.
     /// @return passport The aggregated summary.
     function getPassport(uint256 assetId) external view returns (Passport memory passport) {
         IAssetRegistry.Asset memory asset = _assets().getAsset(assetId);
+
+        passport.assetId = assetId;
+        passport.kind = asset.kind;
+        passport.status = asset.status;
+        passport.verified = asset.verifiedAt != 0;
+        passport.registrarOrgId = asset.registrarOrgId;
+        passport.verifierOrgId = asset.verifierOrgId;
+        passport.registeredAt = asset.registeredAt;
+        passport.verifiedAt = asset.verifiedAt;
+        passport.serialNumberHash = asset.serialNumberHash;
+        passport.metadataHash = asset.metadataHash;
+
         IAssetOwnership.OwnershipRecord memory ownership = _ownership().getOwnership(assetId);
 
-        passport = Passport({
-            assetId: assetId,
-            kind: asset.kind,
-            status: asset.status,
-            verified: asset.verifiedAt != 0,
-            registrarOrgId: asset.registrarOrgId,
-            verifierOrgId: asset.verifierOrgId,
-            registeredAt: asset.registeredAt,
-            verifiedAt: asset.verifiedAt,
-            serialNumberHash: asset.serialNumberHash,
-            metadataHash: asset.metadataHash,
-            owner: ownership.owner,
-            ownedSince: ownership.since,
-            transferFrozen: ownership.transferFrozen,
-            lockedBy: ownership.lockedBy,
-            componentCount: _components().componentCountOf(assetId),
-            documentCount: _documents().documentCountOf(assetId),
-            maintenanceCount: _maintenance().maintenanceCountOf(assetId)
-        });
+        passport.owner = ownership.owner;
+        passport.ownedSince = ownership.since;
+        passport.transferFrozen = ownership.transferFrozen;
+        passport.lockedBy = ownership.lockedBy;
+
+        passport.componentCount = _components().componentCountOf(assetId);
+        passport.documentCount = _documents().documentCountOf(assetId);
+        passport.maintenanceCount = _maintenance().maintenanceCountOf(assetId);
     }
 
     /// @notice Returns an asset's off-chain metadata location.

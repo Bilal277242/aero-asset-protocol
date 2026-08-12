@@ -72,6 +72,21 @@ Other useful commands:
 forge fmt && forge test -vvv && forge snapshot && forge coverage --no-match-coverage "(test|script)/" --report summary
 ```
 
+The default profile compiles through the **IR pipeline** (`via_ir = true`), so the
+bytecode the tests run against is the bytecode that ships. That costs roughly 5–10× in
+compile time; use the `lite` profile for a fast inner loop, but anything you commit must
+pass under the default.
+
+```bash
+FOUNDRY_PROFILE=lite forge test
+```
+
+Static analysis is blocking, and must exit 0 before a change is complete:
+
+```bash
+slither . --config-file slither.config.json --fail-medium
+```
+
 ---
 
 ## Deployment
@@ -155,7 +170,21 @@ are covered by CI rather than only exercised on a live chain.
 | 7 | Escrow + disputes | ✅ |
 | 8 | Invariants, fuzz, static analysis, gas | ✅ |
 | 9 | Deployment scripts + local E2E | ✅ |
+| 10 | Internal audit — 26 findings raised, 25 valid | ✅ |
+| 10a | Gate 0 — permanent fund/state loss (CRITICAL + all HIGH) | ✅ |
+| 10b | Gate 1 — identifier burns, `via_ir`, Slither made blocking | ✅ |
+| 10c | Gate 2 — economic + data integrity | ⬜ |
+| 10d | Gate 3 — housekeeping | ⬜ |
 | 9b | Sepolia deploy + verify | ⬜ needs your RPC + funded key |
+
+The audit lives in [`audit/`](audit/): five domain reviews plus
+[`findings.md`](audit/findings.md), the catalogue and remediation tracker. Every fixed
+finding has a regression test in `test/audit/` — if one fails, that vulnerability is
+back. Static analysis is blocking in CI.
+
+**The audit was performed by the same agent that wrote the code**, which is a real
+weakness in it and is stated plainly at the top of `findings.md`. It does not replace an
+independent human review.
 
 Post-V1: independent security audit, multisig key custody, monitoring, mainnet.
 **AI-generated Solidity is not automatically secure** — an independent human audit is a

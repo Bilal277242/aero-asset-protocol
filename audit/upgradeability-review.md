@@ -194,21 +194,23 @@ invariants against it, regenerate `.gas-snapshot`, and delete the separate `opti
 profile. Test what you ship. If IR compile time is prohibitive locally, keep `lite` for
 iteration but make CI the IR build so nothing merges without IR-pipeline coverage.
 
-Related: **AAP-26** — `lib/openzeppelin-contracts` is pinned to an untagged commit
-(`c64a1edb`, which `git describe` resolves as `v4.8.0-952-g...`) rather than the `v5.4.0`
-tag `CLAUDE.md` mandates. The build and all tests pass against it, so it is very likely a
-v5.x commit whose tag is absent from the fetched history — but the whole point of pinning
-by tag is not having to reason probabilistically about which code you compiled.
+~~Related: **AAP-26** — `lib/openzeppelin-contracts` is pinned to an untagged commit.~~
+
+**Withdrawn — this finding was wrong.** The submodule is pinned to exactly `v5.4.0`;
+`git rev-parse v5.4.0^{commit}` and `HEAD` are the same commit. `v5.4.0` is a
+*lightweight* tag, and `git describe` without `--tags` considers only annotated tags, so
+it falls back to `v4.8.0-952-g…` — which is what `git submodule status` prints and what I
+mistook for the pin. Verify with `git -C lib/openzeppelin-contracts describe --tags`.
 
 ## 8. Recommendations
 
-| Priority | Change | Finding |
-|---|---|---|
-| 1 | Move `via_ir` into default/CI; retest and re-snapshot everything | AAP-10 |
-| 2 | Re-pin OpenZeppelin to the `v5.4.0` tag; re-run the full gate | AAP-26 |
-| 3 | Restore `bytecode_hash`/`cbor_metadata` defaults for explorer verification | AAP-10 |
-| 4 | Write the storage-layout diff step into the upgrade runbook as a hard gate | — |
-| 5 | Document that `RoleManager` rotation requires upgrading every module | — |
+| Priority | Change | Finding | Status |
+|---|---|---|---|
+| 1 | Move `via_ir` into default/CI; retest and re-snapshot everything | AAP-10 | ✅ done |
+| 2 | ~~Re-pin OpenZeppelin~~ | ~~AAP-26~~ | ❌ withdrawn |
+| 3 | Restore `bytecode_hash`/`cbor_metadata` defaults for explorer verification | AAP-10 | ✅ done — the `optimized` profile that stripped them was deleted |
+| 4 | Write the storage-layout diff step into the upgrade runbook as a hard gate | — | ⬜ open |
+| 5 | Document that `RoleManager` rotation requires upgrading every module | — | ⬜ open |
 
 The upgradeability design itself is sound and needs no structural change. Every finding
 in this review is about the **build and release process** around it, not the pattern.

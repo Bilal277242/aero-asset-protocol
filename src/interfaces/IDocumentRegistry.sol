@@ -122,9 +122,12 @@ interface IDocumentRegistry {
     error DocumentNotFound(uint256 documentId);
 
     /// @notice Thrown when a document commitment is already registered.
-    /// @dev Uniqueness makes the hash a usable lookup key and stops the same evidence
-    ///      being counted twice against an asset.
-    /// @param documentHash The commitment already taken.
+    /// @dev Uniqueness is **per asset**, and stops the same evidence being counted
+    ///      twice against one aircraft. It is deliberately not protocol-wide: a global
+    ///      index let anyone permanently burn a hash by registering it against a junk
+    ///      asset they controlled, and could not represent a document covering a fleet
+    ///      (audit AAP-07).
+    /// @param documentHash The commitment already taken for this asset.
     /// @param existingDocumentId The document already holding it.
     error DocumentHashTaken(bytes32 documentHash, uint256 existingDocumentId);
 
@@ -204,10 +207,14 @@ interface IDocumentRegistry {
     /// @return The document record.
     function getDocument(uint256 documentId) external view returns (Document memory);
 
-    /// @notice Returns the document holding a given commitment.
+    /// @notice Returns the document holding a given commitment for an asset.
+    /// @dev Scoped per asset. The same document may legitimately be registered against
+    ///      several aircraft — an Airworthiness Directive covers a fleet — so a
+    ///      protocol-wide lookup would have to pick one arbitrarily.
+    /// @param assetId The asset the document describes.
     /// @param documentHash The commitment to look up.
-    /// @return The document id, or 0 if unused.
-    function documentIdByHash(bytes32 documentHash) external view returns (uint256);
+    /// @return The document id, or 0 if unused for this asset.
+    function documentIdOf(uint256 assetId, bytes32 documentHash) external view returns (uint256);
 
     /// @notice Returns a document's off-chain location.
     /// @param documentId The document id.

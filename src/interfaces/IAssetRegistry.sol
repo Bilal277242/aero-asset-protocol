@@ -117,6 +117,12 @@ interface IAssetRegistry {
         uint256 indexed assetId, AssetStatus indexed from, AssetStatus indexed to, address by
     );
 
+    /// @notice Emitted when a serial-number commitment is freed for re-registration.
+    /// @param assetId The asset that held it.
+    /// @param serialNumberHash The commitment now available again.
+    /// @param by The admin that released it.
+    event SerialNumberHashReleased(uint256 indexed assetId, bytes32 indexed serialNumberHash, address by);
+
     /// @notice Emitted when an asset's verification state changes.
     /// @param assetId The asset id.
     /// @param verifierOrgId The organization credited, or 0.
@@ -157,6 +163,15 @@ interface IAssetRegistry {
     /// @param assetId The asset id.
     /// @param status Its current, non-terminal status.
     error AssetNotTerminal(uint256 assetId, AssetStatus status);
+
+    /// @notice Thrown when releasing a serial hash from an asset that records none.
+    /// @param assetId The asset id.
+    error NoSerialNumberRecorded(uint256 assetId);
+
+    /// @notice Thrown when the serial index does not point at the named asset.
+    /// @param assetId The asset id.
+    /// @param serialNumberHash The commitment it claims.
+    error SerialNumberNotHeld(uint256 assetId, bytes32 serialNumberHash);
 
     /// @notice Thrown when a terminal status would strand a live settlement.
     /// @dev Freezing an asset an escrow has locked would make that trade permanently
@@ -267,6 +282,17 @@ interface IAssetRegistry {
     /// @param assetId The asset id.
     /// @param newStatus The operational status to restore. Must not be terminal.
     function recoverTerminalAsset(uint256 assetId, AssetStatus newStatus) external;
+
+    /// @notice Frees an asset's serial-number commitment for re-registration.
+    /// @dev Restricted to `PROTOCOL_ADMIN_ROLE`, i.e. timelocked and publicly queued.
+    ///      The adjudication path for a squatted serial: registration is permissionless
+    ///      and the index was otherwise permanent, so anyone could compute the hash of a
+    ///      real aircraft's MSN and block its owner forever.
+    ///
+    ///      Clears both the index entry and the asset's own `serialNumberHash`, so the
+    ///      released record cannot keep asserting a serial that another asset now holds.
+    /// @param assetId The asset whose commitment is released.
+    function releaseSerialNumberHash(uint256 assetId) external;
 
     /// @notice Records that an asset has been verified.
     /// @dev Restricted to `ASSET_VERIFIER_ROLE`. Deliberately separate from

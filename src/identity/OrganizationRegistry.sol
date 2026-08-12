@@ -400,6 +400,18 @@ contract OrganizationRegistry is ProtocolModuleUpgradeable, IOrganizationRegistr
             org.verifiedAt = uint40(block.timestamp);
         }
 
+        // Revocation releases the name so it can be registered again (audit AAP-05).
+        // Registration is permissionless and the index was previously permanent, which
+        // meant rejecting a squatted name — the documented mitigation — actually burned
+        // it for the legitimate holder rather than freeing it. A `REVOKED` record is
+        // terminal and can perform no action, so it remains as an audit trail while the
+        // name becomes available.
+        if (to == OrganizationStatus.REVOKED) {
+            delete _s().organizationIdByNameHash[org.nameHash];
+
+            emit OrganizationNameReleased(orgId, org.nameHash);
+        }
+
         emit OrganizationStatusChanged(orgId, from, to, msg.sender);
     }
 

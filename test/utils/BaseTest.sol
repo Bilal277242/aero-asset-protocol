@@ -24,6 +24,11 @@ abstract contract BaseTest is Test {
     address internal credentialIssuer;
     /// @notice Approved maintenance organization used in provenance tests.
     address internal mro;
+    /// @notice Holds `ASSET_VERIFIER_ROLE` where a deployment models production key
+    ///         separation (audit AAP-25). Unit fixtures keep both verifier roles on
+    ///         `orgVerifier` for brevity; separation is a deployment concern, not a
+    ///         protocol-logic one, so only the deployment test distinguishes them.
+    address internal assetVerifier;
     /// @notice Resolves escrow disputes in the controlled-arbitrator model.
     address internal arbitrator;
     /// @notice Receives protocol fees.
@@ -58,6 +63,7 @@ abstract contract BaseTest is Test {
         protocolAdmin = _actor("protocolAdmin");
         pauser = _actor("pauser");
         orgVerifier = _actor("orgVerifier");
+        assetVerifier = _actor("assetVerifier");
         credentialIssuer = _actor("credentialIssuer");
         mro = _actor("mro");
         arbitrator = _actor("arbitrator");

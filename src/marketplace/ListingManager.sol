@@ -2,6 +2,8 @@
 pragma solidity 0.8.28;
 
 import {IAssetRegistry} from "../interfaces/IAssetRegistry.sol";
+import {IComponentRegistry} from "../interfaces/IComponentRegistry.sol";
+import {ProtocolAddressKeys} from "../libraries/ProtocolAddressKeys.sol";
 import {ProtocolCast} from "../libraries/ProtocolCast.sol";
 import {DeadlineInPast} from "../libraries/ProtocolErrors.sol";
 import {MarketplaceBase} from "./MarketplaceBase.sol";
@@ -62,6 +64,11 @@ abstract contract ListingManager is MarketplaceBase {
         if (!_ownership().isTransferable(assetId)) {
             revert AssetNotTransferable(assetId);
         }
+        // An engine bolted to an airframe must be removed before it can be sold
+        // separately (audit AAP-06). Ownership is deliberately blind to installation —
+        // that is what keeps the L2 call graph acyclic — so the check belongs here,
+        // where both facts are already reachable, rather than pushed down into L2a.
+        _requireNotInstalled(assetId);
 
         uint256 existing = activeListingOf(assetId);
         if (existing != 0) {
@@ -133,8 +140,32 @@ abstract contract ListingManager is MarketplaceBase {
         _writeListingStatus(listingId, listing, ListingStatus.EXPIRED);
     }
 
+    /// @notice Reverts if the asset is a component currently fitted to an airframe.
+    /// @dev Reads `ComponentRegistry` through the address book, and treats an asset it
+    ///      does not know about as sellable — aircraft and bare assets are not
+    ///      components and have no record there.
+    /// @param assetId The asset being listed.
+    function _requireNotInstalled(uint256 assetId) private view {
+        IComponentRegistry components = IComponentRegistry(_resolve(ProtocolAddressKeys.COMPONENT_REGISTRY));
+        if (!components.isComponent(assetId)) {
+            return;
+        }
+
+        IComponentRegistry.Component memory component = components.getComponent(assetId);
+        if (component.status == IComponentRegistry.ComponentStatus.INSTALLED) {
+            revert ComponentIsInstalled(assetId, component.parentAssetId);
+        }
+    }
+
     /// @notice Thrown when a listing deadline exceeds the maximum duration.
     /// @param deadline The offending deadline.
     /// @param max The latest permitted deadline.
     error DeadlineTooFar(uint40 deadline, uint40 max);
+
+    /// @notice Thrown when listing a component that is still fitted to an airframe.
+    /// @dev Selling it in place would leave the component graph asserting that an
+    ///      aircraft contains parts its owner does not own. Remove it first.
+    /// @param assetId The component asset id.
+    /// @param parentAssetId The airframe it is fitted to.
+    error ComponentIsInstalled(uint256 assetId, uint256 parentAssetId);
 }

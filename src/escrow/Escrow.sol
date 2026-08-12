@@ -323,6 +323,7 @@ contract Escrow is IEscrow, Initializable, ReentrancyGuardTransient {
     /// @inheritdoc IEscrow
     function disputeDeadline() external view returns (uint40) {
         uint40 raisedAt = disputeRaisedAt;
+        // slither-disable-next-line incorrect-equality
         return raisedAt == 0 ? 0 : raisedAt + DISPUTE_RESOLUTION_WINDOW;
     }
 
@@ -399,13 +400,18 @@ contract Escrow is IEscrow, Initializable, ReentrancyGuardTransient {
     ///      downstream fallback (revert, then timeout refund), and deferring it would
     ///      transfer the aircraft against an IOU.
     ///
-    ///      Effects are already terminal by the time this runs, and the deferred
-    ///      balance is credited before any further interaction, so the deferral path
-    ///      is itself checks-effects-interactions.
+    ///      **Ordering.** The deferred balance is necessarily credited *after* the
+    ///      transfer attempt — there is no way to know a transfer failed before making
+    ///      it — so this is not checks-effects-interactions, and Slither reports it as
+    ///      `reentrancy-benign`. What makes it safe is that the escrow's status is
+    ///      already terminal before `_payout` runs, and every caller carries
+    ///      `nonReentrant`: a token that reenters finds a terminal state machine behind
+    ///      a closed guard. Nothing is read after the credit.
     /// @param token The settlement token.
     /// @param to The intended recipient.
     /// @param amount The amount owed.
     function _payout(IERC20 token, address to, uint256 amount) private {
+        // slither-disable-next-line incorrect-equality
         if (amount == 0) {
             return;
         }
@@ -413,6 +419,7 @@ contract Escrow is IEscrow, Initializable, ReentrancyGuardTransient {
         (bool ok, bytes memory data) = address(token).call(abi.encodeCall(IERC20.transfer, (to, amount)));
         // Mirrors SafeERC20's acceptance rule: a call that reverts fails, and a call
         // returning data must return exactly `true`. Tokens returning nothing pass.
+        // slither-disable-next-line incorrect-equality
         if (ok && (data.length == 0 || abi.decode(data, (bool)))) {
             return;
         }

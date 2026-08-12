@@ -22,14 +22,20 @@ import {DeploymentBase} from "./DeploymentBase.s.sol";
 ///      it leaves an EOA in total control. `Verify.s.sol` fails until it has happened.
 contract ConfigureProtocol is DeploymentBase {
     /// @notice Operational configuration for a deployment.
-    /// @param orgVerifier Holds `ORG_VERIFIER_ROLE` and `ASSET_VERIFIER_ROLE`.
+    /// @param orgVerifier Holds `ORG_VERIFIER_ROLE`.
+    /// @param assetVerifier Holds `ASSET_VERIFIER_ROLE`. Separate from `orgVerifier` by
+    ///        default: attesting to a corporate entity and attesting to an airframe are
+    ///        different competencies, and `docs/roles.md` describes them as distinct
+    ///        roles (audit AAP-25). May be set to the same address on a testnet.
     /// @param credentialIssuer Holds `CREDENTIAL_ISSUER_ROLE`.
-    /// @param arbitrator Holds `ARBITRATOR_ROLE`.
+    /// @param arbitrator Holds `ARBITRATOR_ROLE`. Must be a multisig — `Verify.s.sol`
+    ///        asserts the holder has code.
     /// @param pauser Holds `PAUSER_ROLE`. Must be on keys separate from the admin.
     /// @param settlementToken The initial allowlisted settlement token.
     /// @param marketplaceFeeBps The initial marketplace fee rate.
     struct Config {
         address orgVerifier;
+        address assetVerifier;
         address credentialIssuer;
         address arbitrator;
         address pauser;
@@ -75,7 +81,7 @@ contract ConfigureProtocol is DeploymentBase {
 
         // Operational roles.
         roles.grantRole(ProtocolRoles.ORG_VERIFIER_ROLE, c.orgVerifier);
-        roles.grantRole(ProtocolRoles.ASSET_VERIFIER_ROLE, c.orgVerifier);
+        roles.grantRole(ProtocolRoles.ASSET_VERIFIER_ROLE, c.assetVerifier);
         roles.grantRole(ProtocolRoles.CREDENTIAL_ISSUER_ROLE, c.credentialIssuer);
         roles.grantRole(ProtocolRoles.ARBITRATOR_ROLE, c.arbitrator);
         roles.grantRole(ProtocolRoles.PAUSER_ROLE, c.pauser);
@@ -135,6 +141,9 @@ contract ConfigureProtocol is DeploymentBase {
 
         Config memory c = Config({
             orgVerifier: vm.envAddress("ORG_VERIFIER"),
+            // Falls back to the organization verifier when unset, so an existing
+            // testnet .env keeps working; production should set both.
+            assetVerifier: vm.envOr("ASSET_VERIFIER", vm.envAddress("ORG_VERIFIER")),
             credentialIssuer: vm.envAddress("CREDENTIAL_ISSUER"),
             arbitrator: vm.envAddress("DISPUTE_ARBITRATOR"),
             pauser: vm.envAddress("PROTOCOL_PAUSER"),

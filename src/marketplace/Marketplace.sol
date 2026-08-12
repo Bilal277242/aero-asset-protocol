@@ -67,6 +67,18 @@ contract Marketplace is ListingManager, OfferManager, ReentrancyGuardTransientUp
     /// @param offerId The offer to accept.
     /// @return escrowId The newly opened escrow id.
     /// @return escrow The deployed escrow's address.
+    //
+    // Slither reports `reentrancy-no-eth` here: `listing.escrowId` and `$.escrowOf`
+    // are written after `openEscrow`. That is unavoidable — both values are *returned
+    // by* that call — and it is not exploitable, because `openEscrow` reaches no
+    // untrusted code: it clones a known implementation, grants a role in `RoleManager`,
+    // and initializes the fresh clone. Nothing there can call back. Combined with
+    // `nonReentrant` and the offer already being `ACCEPTED` before the call, a
+    // reentrant path has nothing to reach.
+    //
+    // **Re-examine this suppression if `openEscrow` ever calls out to a caller-supplied
+    // address**, at which point the pattern becomes live rather than merely present.
+    // slither-disable-next-line reentrancy-no-eth
     function acceptOffer(uint256 offerId)
         external
         whenNotPaused

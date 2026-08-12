@@ -99,6 +99,7 @@ contract FullLifecycleTest is BaseTest {
             a,
             ConfigureProtocol.Config({
                 orgVerifier: orgVerifier,
+                assetVerifier: assetVerifier,
                 credentialIssuer: credentialIssuer,
                 arbitrator: arbitrator,
                 pauser: pauser,
@@ -220,7 +221,9 @@ contract FullLifecycleTest is BaseTest {
             );
         assertEq(AssetOwnership(a.assetOwnership).ownerOf(aircraftId), alice, "ownership not created at registration");
 
-        vm.prank(orgVerifier);
+        // A distinct key from the organization verifier: attesting to a corporate
+        // entity and attesting to an airframe are different competencies (AAP-25).
+        vm.prank(assetVerifier);
         AssetRegistry(a.assetRegistry).verifyAsset(aircraftId, airline);
 
         // 5. An engine is registered and installed.
