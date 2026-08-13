@@ -99,6 +99,15 @@ interface IEscrow {
     /// @param deadline After this, {claimDisputeTimeout} refunds the buyer.
     event DisputeDeadlineSet(uint256 indexed escrowId, uint40 deadline);
 
+    /// @notice Emitted when a lapsed buyer forfeits part of their deposit.
+    /// @dev Only on the buyer-fault timeout path. A refund the buyer did not cause —
+    ///      an arbitrator ruling for them, or arbitration never happening — returns the
+    ///      deposit in full and emits nothing here.
+    /// @param escrowId The escrow id.
+    /// @param seller The compensated seller.
+    /// @param amount The forfeited amount.
+    event TimeoutPenaltyCharged(uint256 indexed escrowId, address indexed seller, uint256 amount);
+
     /*//////////////////////////////////////////////////////////////
                                   ERRORS
     //////////////////////////////////////////////////////////////*/
@@ -217,6 +226,10 @@ interface IEscrow {
                                   VIEWS
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Returns this escrow's id, as assigned by the factory.
+    /// @return The escrow id.
+    function escrowId() external view returns (uint256);
+
     /// @notice Returns the escrow's current lifecycle state.
     /// @return The status.
     function status() external view returns (EscrowStatus);
@@ -237,6 +250,11 @@ interface IEscrow {
     /// @dev A published constant, so both parties know the bound before they trade.
     /// @return The window in seconds.
     function DISPUTE_RESOLUTION_WINDOW() external view returns (uint40);
+
+    /// @notice Returns the share of a deposit forfeited on a buyer-fault timeout.
+    /// @dev A published constant in immutable code; no admin action can raise it.
+    /// @return The penalty in basis points.
+    function TIMEOUT_PENALTY_BPS() external view returns (uint16);
 
     /// @notice Returns when the dispute was raised, or 0 if none has been.
     /// @return The dispute timestamp.

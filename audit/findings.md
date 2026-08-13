@@ -30,17 +30,42 @@ differently, and may find whole classes of issue I am blind to.
 
 ## Remediation status
 
-**Gates 0 and 1 are complete.** Thirteen findings are fixed, with 25 regression tests
-across `test/audit/Gate0Regression.t.sol` and `Gate1Regression.t.sol` running in CI.
-Gates 2 and 3 remain outstanding; none of their findings can strand value.
+**Gates 0, 1 and 2 are complete.** Nineteen findings are fixed, with 39 regression tests
+across `test/audit/Gate{0,1,2}Regression.t.sol` running in CI. Only Gate 3 —
+housekeeping — remains open.
 
 | Gate | Findings | Status |
 |---|---|---|
 | 0 | AAP-01, AAP-02, AAP-03, AAP-04, AAP-13 | ✅ **remediated** |
 | 1 | AAP-05, AAP-06, AAP-07, AAP-08, AAP-10, AAP-14, AAP-24, AAP-25 | ✅ **remediated** |
-| 2 | AAP-09, AAP-11, AAP-12, AAP-15, AAP-17, AAP-18 | ⬜ open |
+| 2 | AAP-09, AAP-11, AAP-12, AAP-15, AAP-17, AAP-18 | ✅ **remediated** |
 | 3 | AAP-16, AAP-19, AAP-20, AAP-21, AAP-22, AAP-23 | ⬜ open |
 | — | **AAP-26** | ❌ **withdrawn — false positive** |
+
+### Two Gate 2 fixes deliberately depart from the written recommendation
+
+**AAP-12 — no backdating cap was added.** The recommendation was a 90-day
+`MAX_BACKDATING` plus floors at the asset's `registeredAt` and the credential's
+`issuedAt`. Implementing it would have broken a primary use case: **backfilling an
+airframe's existing service history at onboarding**, which necessarily predates both
+the asset's registration and the current credential. Any cap tight enough to stop
+fabrication also stops legitimate backfill, and a cap loose enough to permit backfill
+stops nothing.
+
+What went in instead is `recordedAt` — the protocol's own observation of when a claim
+was made — stored in the record and emitted. A fabricated four-year history is then
+plainly visible as twelve records that all appeared on-chain in the same block. The
+guarantee changes from *prevented* to *detectable*, which is the correct ceiling for an
+on-chain protocol recording an off-chain fact it cannot verify. The contract NatSpec now
+states that a consumer reading `performedAt` without `recordedAt` is misreading the
+registry.
+
+**AAP-09 — `SETTLEMENT_WINDOW` was shortened but not parameterized.** The
+recommendation asked for both a timeout penalty and a per-listing window within a bounded
+range. The penalty is implemented and the window drops 30d → 14d. Per-listing
+parameterization was not: it adds an external API parameter and a field to the packed
+`Listing` struct, which is product surface rather than a fix, and the vulnerability —
+free optionality — is addressed by pricing it. Worth revisiting as a feature.
 
 ### AAP-26 was wrong
 
@@ -84,22 +109,23 @@ single point of failure is AAP-01's timeout fallback, which is implemented.
 |---|---|---|---|
 | CRITICAL | 1 | 1 | 0 |
 | HIGH | 3 | 3 | 0 |
-| MEDIUM | 10 | 7 | 3 |
-| LOW | 5 | 0 | 5 |
+| MEDIUM | 10 | 10 | 0 |
+| LOW | 5 | 3 | 2 |
 | INFORMATIONAL | 6 | 2 | 4 |
-| **Total** | **25** | **13** | **12** |
+| **Total** | **25** | **19** | **6** |
 
 One further finding (AAP-26) was reported and later withdrawn as a false positive, so 26
 were raised and 25 stand.
 
-**Every CRITICAL, HIGH, and severity-MEDIUM finding that concerns permanent loss of
-funds or state is closed.** The three open MEDIUMs are AAP-09 (buyer's free option),
-AAP-11 (post-verification metadata mutation) and AAP-12 (unbounded maintenance
-backdating) — all economic or data-integrity issues, none of which can strand value.
+**Every CRITICAL, HIGH and MEDIUM finding is closed.** What remains is six items rated
+LOW or INFORMATIONAL: two documentation/semantics corrections (AAP-16, AAP-19) and four
+housekeeping items (AAP-20 dead branches, AAP-21 cast-policy consistency, AAP-22 call
+coalescing, AAP-23 event ordering). None affects funds, state or authorization.
 
-No finding permits an unprivileged attacker to **steal** funds. The most severe issues
-are **permanent freezing of funds and permanent destruction of asset state** by an
-ordinary counterparty, which the protocol's state machines allow by construction.
+No finding permitted an unprivileged attacker to **steal** funds. The severe ones were
+**permanent freezing of funds and permanent destruction of asset state** by an ordinary
+counterparty — reachable because the state machines allowed it by construction, and now
+closed.
 
 A ✅ marks a remediated finding.
 
@@ -113,16 +139,16 @@ A ✅ marks a remediated finding.
 | AAP-06 | MEDIUM | ✅ An installed component can be sold off its airframe | `ComponentRegistry` / `Marketplace` |
 | AAP-07 | MEDIUM | ✅ Document-hash uniqueness is global and permanent — cross-asset DoS | `DocumentRegistry` |
 | AAP-08 | MEDIUM | ✅ Serial-number hash squatting permanently burns an identifier | `AssetRegistry` |
-| AAP-09 | MEDIUM | Buyer holds a free 30-day option on the seller's asset | `Escrow` / `Marketplace` |
+| AAP-09 | MEDIUM | ✅ Buyer holds a free 30-day option on the seller's asset | `Escrow` / `Marketplace` |
 | AAP-10 | MEDIUM | ✅ `via_ir` profile ships bytecode the test suite never exercised | `foundry.toml` |
-| AAP-11 | MEDIUM | Verified organization can silently mutate its metadata | `OrganizationRegistry` |
-| AAP-12 | MEDIUM | Maintenance records can be backdated without bound | `MaintenanceRegistry` |
+| AAP-11 | MEDIUM | ✅ Verified organization can silently mutate its metadata | `OrganizationRegistry` |
+| AAP-12 | MEDIUM | ✅ Maintenance records can be backdated without bound | `MaintenanceRegistry` |
 | AAP-13 | MEDIUM | ✅  Blacklistable settlement token can permanently brick the refund path | `Escrow` |
 | AAP-14 | MEDIUM | ✅ `Verify.s.sol` does not constrain operational role holders | `script/Verify.s.sol` |
-| AAP-15 | LOW | Treasury resolved at settlement, not captured at acceptance | `Escrow` / `FeeManager` |
+| AAP-15 | LOW | ✅ Treasury resolved at settlement, not captured at acceptance | `Escrow` / `FeeManager` |
 | AAP-16 | LOW | `fund()` performs an interaction before its effects, contradicting its NatSpec | `Escrow` |
-| AAP-17 | LOW | Revoked organization's admin retains operator and admin-transfer powers | `OrganizationRegistry` |
-| AAP-18 | LOW | Token allowlist is checked at listing but never re-checked at acceptance | `Marketplace` |
+| AAP-17 | LOW | ✅ Revoked organization's admin retains operator and admin-transfer powers | `OrganizationRegistry` |
+| AAP-18 | LOW | ✅ Token allowlist is checked at listing but never re-checked at acceptance | `Marketplace` |
 | AAP-19 | LOW | Seller can front-run `withdrawOffer` with `acceptOffer` | `Marketplace` |
 | AAP-20 | INFORMATIONAL | Unreachable `expiresAt == 0` branches in four contracts | `Marketplace` |
 | AAP-21 | INFORMATIONAL | Raw `uint40(block.timestamp)` casts bypass the `ProtocolCast` policy | multiple |

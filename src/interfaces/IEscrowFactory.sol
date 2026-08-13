@@ -22,14 +22,19 @@ interface IEscrowFactory {
     /// @param feeAmount The protocol fee, already deducted from `price` to give the
     ///        seller's proceeds. Quoted at acceptance so a later fee change cannot
     ///        re-price a live trade.
+    /// @param treasury The account the protocol fee is paid to. Captured here rather
+    ///        than resolved at settlement so a treasury change cannot redirect the fee
+    ///        on a trade both parties have already agreed (audit AAP-15).
     /// @param fundingDeadline After this, the escrow may be cancelled unfunded.
-    /// @param settlementDeadline After this, anyone may refund the buyer.
+    /// @param settlementDeadline After this, anyone may refund the buyer, less the
+    ///        timeout penalty.
     struct EscrowTerms {
         uint256 listingId;
         uint256 assetId;
         address buyer;
         address seller;
         address paymentToken;
+        address treasury;
         uint128 price;
         uint128 feeAmount;
         uint40 fundingDeadline;

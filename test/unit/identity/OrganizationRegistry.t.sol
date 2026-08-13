@@ -129,6 +129,9 @@ contract OrganizationRegistryTest is ProtocolTestBase {
     }
 
     /// @notice Updates cannot change type, status or name.
+    /// @dev Changing the attested metadata hash demotes a verified organization to
+    ///      `SUSPENDED` (audit AAP-11), so this asserts the *identity* fields survive —
+    ///      type and name — not the status. Status is covered by the AAP-11 regression.
     function test_Update_LeavesIdentityFieldsIntact() public {
         uint256 orgId = _defaultVerifiedOrg();
 
@@ -137,8 +140,8 @@ contract OrganizationRegistryTest is ProtocolTestBase {
 
         IOrganizationRegistry.Organization memory org = orgRegistry.getOrganization(orgId);
         assertEq(uint8(org.orgType), uint8(AIRLINE), "type changed");
-        assertEq(uint8(org.status), uint8(IOrganizationRegistry.OrganizationStatus.VERIFIED), "status changed");
         assertEq(org.nameHash, ORG_NAME_HASH, "name changed");
+        assertTrue(org.verifiedAt != 0, "first-verification timestamp lost");
     }
 
     /// @notice A revoked organization's record stops changing.

@@ -70,6 +70,29 @@ no upgrade to be compatible with.
 Packing rules applied throughout (`asset-model.md` §0): ids are `uint64`, timestamps
 `uint40`, enums `uint8`, short human strings `bytes32`, long strings in side mappings.
 
+### Narrowing-cast policy
+
+Packing only works if narrowing a value into it cannot silently truncate — a truncated
+id would alias an unrelated record. The rule, stated once here because it was previously
+inferable only by reading every call site (audit AAP-21):
+
+> **Every narrowing cast of a caller-supplied value goes through `ProtocolCast`**, which
+> reverts with `ValueTooLarge` rather than truncating. **`block.timestamp` is exempt**
+> and is cast directly.
+
+The exemption is not a shortcut. `ProtocolCast` exists to reject hostile or mistaken
+*input*; `block.timestamp` is neither caller-supplied nor capable of exceeding `uint40`
+before the year 36812, so a checked cast there is a branch on a condition that cannot
+occur, on paths that write it on every registration, transfer and settlement.
+
+Caller-supplied *deadlines* are a different matter and are **not** exempt — they arrive
+as `uint40` at the ABI boundary and are range-checked against `block.timestamp` by the
+function that accepts them.
+
+Two consequences worth stating: this rule is what makes a grep for `uint40(` reviewable
+(every hit should be `block.timestamp`), and widening a timestamp field later would
+require revisiting it.
+
 **Measured effect** (recorded in `.gas-snapshot` from Phase 3 onward): registering an
 aircraft writes 6 slots rather than the 11 an unpacked layout would require — roughly
 110k gas saved on a cold registration.

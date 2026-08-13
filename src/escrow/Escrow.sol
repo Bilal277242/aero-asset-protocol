@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 import {IAssetOwnership} from "../interfaces/IAssetOwnership.sol";
 import {IEscrow} from "../interfaces/IEscrow.sol";
 import {IEscrowFactory} from "../interfaces/IEscrowFactory.sol";
-import {IFeeManager} from "../interfaces/IFeeManager.sol";
 import {IMarketplace} from "../interfaces/IMarketplace.sol";
 import {IProtocolAddressRegistry} from "../interfaces/IProtocolAddressRegistry.sol";
 import {IRoleManager} from "../interfaces/IRoleManager.sol";
@@ -83,6 +82,24 @@ contract Escrow is IEscrow, Initializable, ReentrancyGuardTransient {
     ///      funds indefinitely at the cost of one transaction, and a lost arbitrator
     ///      key would strand every disputed trade permanently.
     uint40 public constant DISPUTE_RESOLUTION_WINDOW = 14 days;
+
+    /// @notice Share of the deposit forfeited to the seller when a funded buyer lets
+    ///         the settlement deadline lapse.
+    /// @dev 2%, a `constant` in immutable code so no admin action can raise it.
+    ///
+    ///      Prices what was previously free. Between funding and `settlementDeadline`
+    ///      only the buyer can `release`, and a full refund on timeout handed them a
+    ///      costless option on the asset: exercise if the price rose, walk if it fell,
+    ///      while the seller's aircraft sat locked and unsaleable either way
+    ///      (audit AAP-09).
+    ///
+    ///      Charged **only** on the buyer-fault path, {claimTimeout}. A refund the buyer
+    ///      did not cause — an arbitrator ruling in their favour, or arbitration failing
+    ///      to happen at all — returns the deposit in full.
+    uint16 public constant TIMEOUT_PENALTY_BPS = 200;
+
+    /// @notice Basis-point denominator.
+    uint16 internal constant BPS_DENOMINATOR = 10_000;
 
     /// @notice This escrow's id, assigned by the factory.
     uint256 public escrowId;
@@ -213,7 +230,10 @@ contract Escrow is IEscrow, Initializable, ReentrancyGuardTransient {
             revert SettlementDeadlineNotPassed(terms.settlementDeadline, uint40(block.timestamp));
         }
 
-        _refund();
+        // The buyer had the whole settlement window and did not take delivery. The
+        // seller carried a locked, unsaleable asset for that entire period, so the
+        // penalty compensates them for it. See {TIMEOUT_PENALTY_BPS}.
+        _refund(TIMEOUT_PENALTY_BPS);
     }
 
     /// @inheritdoc IEscrow
@@ -280,10 +300,10 @@ contract Escrow is IEscrow, Initializable, ReentrancyGuardTransient {
             revert DisputeDeadlineNotPassed(deadline, uint40(block.timestamp));
         }
 
-        // The buyer is made whole. Refund-by-default removes the incentive to dispute
-        // as a griefing tactic: a party who disputes to stall now only delays a refund
-        // they were never able to prevent.
-        _refund();
+        // The buyer is made whole, in full. No penalty: arbitration failing to happen
+        // is not the buyer's fault, and charging them for it would let a seller
+        // manufacture a fee by disputing and then waiting.
+        _refund(0);
     }
 
     /// @inheritdoc IEscrow
@@ -298,11 +318,12 @@ contract Escrow is IEscrow, Initializable, ReentrancyGuardTransient {
         emit DisputeResolved(escrowId, msg.sender, releaseToSeller);
 
         // The arbitrator chooses a winner and nothing else: it cannot alter amounts,
-        // pay a third party, or reach a non-disputed escrow.
+        // pay a third party, or reach a non-disputed escrow. A ruling for the buyer
+        // refunds in full — the arbitrator found they were not at fault.
         if (releaseToSeller) {
             _settle();
         } else {
-            _refund();
+            _refund(0);
         }
     }
 
@@ -352,11 +373,13 @@ contract Escrow is IEscrow, Initializable, ReentrancyGuardTransient {
 
         IERC20 token = IERC20(terms.paymentToken);
         if (fee != 0) {
-            address treasury = _fees().treasury();
+            // Frozen at acceptance, like every other economic parameter, so a treasury
+            // change cannot redirect the fee on a trade already agreed (audit AAP-15).
+            //
             // Deferrable. A treasury that cannot receive must not halt settlement for
             // every trade in the protocol at once; the fee is claimable later.
-            _payout(token, treasury, fee);
-            emit FeeCollected(terms.paymentToken, treasury, fee, ProtocolFeeTypes.MARKETPLACE);
+            _payout(token, terms.treasury, fee);
+            emit FeeCollected(terms.paymentToken, terms.treasury, fee, ProtocolFeeTypes.MARKETPLACE);
         }
 
         // **Strict, deliberately.** If the seller cannot be paid, the aircraft must not
@@ -368,8 +391,26 @@ contract Escrow is IEscrow, Initializable, ReentrancyGuardTransient {
         emit EscrowSettled(escrowId, terms.seller, proceeds, fee);
     }
 
-    /// @notice Returns the full deposit to the buyer and releases the asset.
-    function _refund() private {
+    /// @notice Returns the deposit to the buyer and releases the asset.
+    /// @dev The asset never moved, so the buyer is repaid everything except any
+    ///      penalty, which goes to the seller for having carried a locked asset.
+    /// @param penaltyBps Share of the deposit forfeited to the seller, in basis points.
+    ///        Non-zero only on the buyer-fault timeout path.
+    //
+    // Slither reports `reentrancy-no-eth` here, escalated from `reentrancy-benign` once
+    // the penalty split made this two payouts instead of one: the second `_payout` can
+    // write `withdrawable`/`totalDeferred` after the first has already called the token.
+    //
+    // The token is the only untrusted callee, and it can reenter — but nothing it can
+    // reach does damage. Status is written terminal before any external call, so every
+    // state-machine path fails its precondition; and every function that touches funds,
+    // including {withdraw}, carries `nonReentrant`, which is already held by the caller
+    // that reached here.
+    //
+    // **Re-examine if a fund-touching function is ever added without `nonReentrant`, or
+    // if a payout is ever made before the status is terminal.**
+    // slither-disable-next-line reentrancy-no-eth
+    function _refund(uint16 penaltyBps) private {
         IEscrowFactory.EscrowTerms memory terms = _terms;
         uint256 deposited = depositedAmount;
 
@@ -380,10 +421,20 @@ contract Escrow is IEscrow, Initializable, ReentrancyGuardTransient {
         _marketplace().clearEscrow(terms.listingId);
         _disarm();
 
-        // The buyer is repaid in full; the asset never moved.
-        _payout(IERC20(terms.paymentToken), terms.buyer, deposited);
+        // `penalty + returned == deposited` exactly: the buyer takes the remainder, so
+        // rounding can neither create nor destroy dust, exactly as in `_settle`.
+        uint256 penalty = (deposited * penaltyBps) / BPS_DENOMINATOR;
+        uint256 returned = deposited - penalty;
 
-        emit EscrowRefunded(escrowId, terms.buyer, deposited);
+        IERC20 token = IERC20(terms.paymentToken);
+        if (penalty != 0) {
+            _payout(token, terms.seller, penalty);
+
+            emit TimeoutPenaltyCharged(escrowId, terms.seller, penalty);
+        }
+        _payout(token, terms.buyer, returned);
+
+        emit EscrowRefunded(escrowId, terms.buyer, returned);
     }
 
     /// @notice Pays `to`, deferring the amount if the transfer cannot be delivered.
@@ -474,11 +525,5 @@ contract Escrow is IEscrow, Initializable, ReentrancyGuardTransient {
     /// @return The current `Marketplace`.
     function _marketplace() private view returns (IMarketplace) {
         return IMarketplace(ADDRESS_REGISTRY.getAddress(ProtocolAddressKeys.MARKETPLACE));
-    }
-
-    /// @notice Resolves the fee manager.
-    /// @return The current `FeeManager`.
-    function _fees() private view returns (IFeeManager) {
-        return IFeeManager(ADDRESS_REGISTRY.getAddress(ProtocolAddressKeys.FEE_MANAGER));
     }
 }

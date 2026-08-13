@@ -128,7 +128,13 @@ contract EscrowSecurityTest is ProtocolTestBase {
 
         assertFalse(token.reentrySucceeded(), "re-entrant refund succeeded");
         assertEq(token.balanceOf(escrow), 0, "escrow retained funds");
-        assertEq(token.balanceOf(bob), PRICE, "buyer received more or less than the deposit");
+
+        // Conservation still holds exactly across the timeout penalty: the deposit is
+        // split between buyer and seller and nothing is created or destroyed.
+        uint256 penalty = (uint256(PRICE) * IEscrow(escrow).TIMEOUT_PENALTY_BPS()) / 10_000;
+        assertEq(token.balanceOf(bob), PRICE - penalty, "buyer received more or less than the remainder");
+        assertEq(token.balanceOf(alice), penalty, "seller did not receive the penalty");
+        assertEq(token.balanceOf(bob) + token.balanceOf(alice), PRICE, "deposit not conserved");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -364,6 +370,7 @@ contract EscrowSecurityTest is ProtocolTestBase {
             buyer: bob,
             seller: alice,
             paymentToken: address(settlementToken),
+            treasury: treasury,
             price: PRICE,
             feeAmount: 0,
             fundingDeadline: uint40(block.timestamp + 1 days),

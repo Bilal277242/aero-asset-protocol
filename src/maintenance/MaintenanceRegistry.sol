@@ -35,6 +35,21 @@ import {ZeroHash} from "../libraries/ProtocolErrors.sol";
 ///      append-only (`docs/state-machines.md` §1), and the credential relied upon is
 ///      emitted so an auditor can pin every record to a specific credential.
 ///
+///      **Backdating is visible, not prevented** (audit AAP-12). `performedAt` is a
+///      caller-supplied assertion about the physical world, bounded only by not being
+///      in the future. The protocol cannot verify it, and must not forbid old dates:
+///      backfilling an airframe's existing service history at onboarding is a primary
+///      use case, so any cap tight enough to stop fabrication would also break the
+///      legitimate case.
+///
+///      What the protocol can do — and now does — is record `recordedAt`, its own
+///      observation of when the claim was made, alongside the claim. Twelve records
+///      spanning four years that all appeared on-chain in the same block are then
+///      plainly visible as such.
+///
+///      **A consumer reading `performedAt` without `recordedAt` is misreading this
+///      registry.** Only the second date is one the protocol witnessed.
+///
 ///      **Non-claim.** Recording maintenance is a protocol permission. It is not a
 ///      regulatory approval, not a certificate of release to service, and not a
 ///      determination of airworthiness by any civil aviation authority.
@@ -108,18 +123,21 @@ contract MaintenanceRegistry is ProtocolModuleUpgradeable, IMaintenanceRegistry 
             recordId = ++$.maintenanceCount;
         }
 
+        uint40 recordedAt = uint40(block.timestamp);
+
         $.records[recordId] = MaintenanceRecord({
             assetId: assetId.toUint64(),
             performedByOrgId: performedByOrgId.toUint64(),
             documentId: documentId.toUint64(),
             performedAt: performedAt,
             mType: mType,
+            recordedAt: recordedAt,
             recordHash: recordHash
         });
         $.assetRecords[assetId].push(recordId);
 
         emit MaintenanceRecorded(
-            recordId, assetId, performedByOrgId, mType, performedAt, credentialId, documentId, recordHash
+            recordId, assetId, performedByOrgId, mType, performedAt, recordedAt, credentialId, documentId, recordHash
         );
     }
 

@@ -297,8 +297,10 @@ contract EscrowTest is ProtocolTestBase {
         vm.prank(caller);
         escrow.claimTimeout();
 
-        // Refund goes to the recorded buyer, never to the caller.
-        assertEq(settlementToken.balanceOf(bob) - buyerBefore, PRICE, "buyer not made whole");
+        // Refund goes to the recorded buyer, never to the caller — less the timeout
+        // penalty, which goes to the seller for having carried a locked asset (AAP-09).
+        uint256 penalty = (uint256(PRICE) * escrow.TIMEOUT_PENALTY_BPS()) / 10_000;
+        assertEq(settlementToken.balanceOf(bob) - buyerBefore, PRICE - penalty, "buyer not refunded the remainder");
         assertEq(settlementToken.balanceOf(address(escrow)), 0, "escrow retained funds");
         assertEq(uint8(escrow.status()), uint8(IEscrow.EscrowStatus.REFUNDED), "not REFUNDED");
 
@@ -343,7 +345,10 @@ contract EscrowTest is ProtocolTestBase {
         // ...but the refund is not.
         escrow.claimTimeout();
         assertEq(uint8(escrow.status()), uint8(IEscrow.EscrowStatus.REFUNDED), "refund blocked by pause");
-        assertEq(settlementToken.balanceOf(bob), PRICE, "buyer not made whole");
+
+        uint256 penalty = (uint256(PRICE) * escrow.TIMEOUT_PENALTY_BPS()) / 10_000;
+        assertEq(settlementToken.balanceOf(bob), PRICE - penalty, "buyer not refunded the remainder");
+        assertEq(settlementToken.balanceOf(address(escrow)), 0, "escrow retained funds");
     }
 
     /*//////////////////////////////////////////////////////////////

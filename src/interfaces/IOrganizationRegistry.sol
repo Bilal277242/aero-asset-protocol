@@ -91,6 +91,15 @@ interface IOrganizationRegistry {
     /// @param metadataURI The new off-chain profile location.
     event OrganizationUpdated(uint256 indexed orgId, bytes32 metadataHash, string metadataURI);
 
+    /// @notice Emitted when a verified organization changes its attested metadata.
+    /// @dev Accompanies the automatic demotion to `SUSPENDED`. Verification attests to a
+    ///      specific metadata commitment; changing it invalidates what was reviewed, so
+    ///      the record must be looked at again before it regains `VERIFIED`.
+    /// @param orgId The organization id.
+    /// @param previousHash The commitment that was verified.
+    /// @param newHash The commitment now claimed.
+    event OrganizationRequiresReverification(uint256 indexed orgId, bytes32 previousHash, bytes32 newHash);
+
     /// @notice Emitted when revocation frees a name hash for re-registration.
     /// @dev The revoked record itself is retained as an audit trail; only the
     ///      uniqueness index entry is released.

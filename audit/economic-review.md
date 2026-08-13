@@ -172,16 +172,30 @@ For an illiquid asset class where every trade is negotiated, it is the right mod
 
 ## 7. Summary of economic recommendations
 
-| Priority | Change | Addresses |
-|---|---|---|
-| 1 | Dispute resolution deadline with permissionless refund | AAP-01 |
-| 2 | Pull-payment fallback so one blacklisted party cannot block a terminal transition | AAP-13 |
-| 3 | Timeout penalty (bounded %) forfeited to the seller on buyer-fault timeout | AAP-09 |
-| 4 | Shorten and parameterize `SETTLEMENT_WINDOW` | AAP-09 |
-| 5 | Refundable bonds on `raiseDispute` and `registerOrganization` | AAP-01, AAP-05 |
-| 6 | Scope document-hash uniqueness per asset; timelocked clearing for orgs and serials | AAP-05/07/08 |
-| 7 | Capture `treasury` in `EscrowTerms` at acceptance | AAP-15 |
+| Priority | Change | Addresses | Status |
+|---|---|---|---|
+| 1 | Dispute resolution deadline with permissionless refund | AAP-01 | ✅ Gate 0 |
+| 2 | Pull-payment fallback so one blacklisted party cannot block a terminal transition | AAP-13 | ✅ Gate 0 |
+| 3 | Timeout penalty (bounded %) forfeited to the seller on buyer-fault timeout | AAP-09 | ✅ Gate 2 — 200 bps |
+| 4 | Shorten `SETTLEMENT_WINDOW` | AAP-09 | ✅ Gate 2 — 30d → 14d |
+| 4b | Parameterize it per listing within a bounded range | AAP-09 | ⬜ deferred — product surface, not a fix |
+| 5 | Refundable bonds on `raiseDispute` and `registerOrganization` | AAP-01, AAP-05 | ⬜ **still open** |
+| 6 | Scope document-hash uniqueness per asset; timelocked clearing for orgs and serials | AAP-05/07/08 | ✅ Gate 1 |
+| 7 | Capture `treasury` in `EscrowTerms` at acceptance | AAP-15 | ✅ Gate 2 |
 
 Items 1–2 are correctness — funds must always have an exit. Items 3–5 are incentive
 design — every griefing action should cost the griefer something. Items 6–7 are
 consistency fixes.
+
+**Item 5 is the one genuinely still open, and it is the most interesting.** The
+remediations so far remove the *permanence* of each griefing outcome — a frozen deposit
+now times out, a burned name is now recoverable — but they do not make griefing *cost*
+anything. Every attack in the table above still prices at one transaction's gas for the
+attacker. The timeout penalty (item 3) is the single exception, and it applies to one
+path.
+
+Bonds would close that gap: a stake on `raiseDispute` forfeited if the arbitrator rules
+against the raiser, and a refundable stake on `registerOrganization` returned on
+verification. Neither is implemented, both are additive rather than corrective, and both
+change the protocol's UX enough to deserve a deliberate product decision rather than an
+audit remediation. Recorded here so the omission is visible rather than forgotten.

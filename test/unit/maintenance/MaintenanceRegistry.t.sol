@@ -42,10 +42,11 @@ contract MaintenanceRegistryTest is ProtocolTestBase {
     ///      trail, and no later on-chain logic reads it.
     function test_Record_ByCredentialedMro() public {
         uint40 performed = uint40(block.timestamp - 2 days);
+        uint40 recorded = uint40(block.timestamp);
 
         vm.expectEmit(true, true, true, true, address(maintenanceRegistry));
         emit IMaintenanceRegistry.MaintenanceRecorded(
-            1, assetId, mroOrg, C_CHECK, performed, credentialId, 0, WORK_PACKAGE
+            1, assetId, mroOrg, C_CHECK, performed, recorded, credentialId, 0, WORK_PACKAGE
         );
         vm.prank(mro);
         uint256 recordId = maintenanceRegistry.recordMaintenance(assetId, mroOrg, C_CHECK, performed, 0, WORK_PACKAGE);

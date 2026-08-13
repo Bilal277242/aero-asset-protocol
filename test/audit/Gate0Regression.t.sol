@@ -265,15 +265,19 @@ contract Gate0Regression is ProtocolTestBase {
         escrow.claimTimeout();
 
         // The escrow still reached its terminal state rather than reverting forever.
+        // The buyer's share is the deposit less the AAP-09 timeout penalty.
+        uint256 penalty = (uint256(PRICE) * escrow.TIMEOUT_PENALTY_BPS()) / 10_000;
+        uint256 owed = PRICE - penalty;
+
         assertEq(uint8(escrow.status()), uint8(IEscrow.EscrowStatus.REFUNDED), "refund blocked by blacklist");
-        assertEq(escrow.withdrawable(bob), PRICE, "refund not deferred");
-        assertEq(escrow.totalDeferred(), PRICE, "deferred total wrong");
+        assertEq(escrow.withdrawable(bob), owed, "refund not deferred");
+        assertEq(escrow.totalDeferred(), owed, "deferred total wrong");
 
         // Once the block lifts, the funds are claimable.
         token.setBlocked(bob, false);
         escrow.withdraw(bob);
 
-        assertEq(token.balanceOf(bob), PRICE, "buyer not repaid");
+        assertEq(token.balanceOf(bob), owed, "buyer not repaid");
         assertEq(escrow.withdrawable(bob), 0, "balance not cleared");
         assertEq(escrow.totalDeferred(), 0, "deferred total not cleared");
     }
@@ -327,10 +331,15 @@ contract Gate0Regression is ProtocolTestBase {
         assertEq(uint8(escrow.status()), uint8(IEscrow.EscrowStatus.FUNDED), "status advanced despite failed payment");
         assertEq(assetOwnership.ownerOf(assetId), alice, "asset moved without payment");
 
-        // The buyer is not stranded: the timeout path still returns their funds.
+        // The buyer is not stranded: the timeout path still returns their funds, less
+        // the AAP-09 penalty. The seller is blacklisted, so their penalty share defers
+        // rather than blocking the buyer's refund.
         vm.warp(block.timestamp + 31 days);
         escrow.claimTimeout();
-        assertEq(token.balanceOf(bob), PRICE, "buyer not refunded");
+
+        uint256 penalty = (uint256(PRICE) * escrow.TIMEOUT_PENALTY_BPS()) / 10_000;
+        assertEq(token.balanceOf(bob), PRICE - penalty, "buyer not refunded");
+        assertEq(escrow.withdrawable(alice), penalty, "blacklisted seller's penalty not deferred");
     }
 
     /// @notice Withdrawing with nothing owed reverts rather than silently succeeding.

@@ -139,15 +139,24 @@ contract OrganizationRegistry is ProtocolModuleUpgradeable, IOrganizationRegistr
         OrganizationRegistryStorage storage $ = _s();
         Organization storage org = $.organizations[orgId];
 
-        // A revoked organization is terminal; its record must stop changing.
-        if (org.status == OrganizationStatus.REVOKED) {
-            revert InvalidOrganizationTransition(OrganizationStatus.REVOKED, OrganizationStatus.REVOKED);
-        }
+        _requireNotRevoked(org);
 
+        bytes32 previousHash = org.metadataHash;
         org.metadataHash = metadataHash;
         $.metadataURI[orgId] = uri;
 
         emit OrganizationUpdated(orgId, metadataHash, uri);
+
+        // Changing *what was attested* costs the verification; changing only *where it
+        // lives* does not. `ORG_VERIFIER_ROLE` reviewed a specific metadata commitment,
+        // and a verified badge over content the subject swapped afterwards is the
+        // classic verify-then-swap (audit AAP-11). Demotion is to `SUSPENDED`, which is
+        // reversible by the same role that granted verification in the first place.
+        if (org.status == OrganizationStatus.VERIFIED && metadataHash != previousHash) {
+            emit OrganizationRequiresReverification(orgId, previousHash, metadataHash);
+
+            _writeStatus(orgId, org, OrganizationStatus.VERIFIED, OrganizationStatus.SUSPENDED);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -160,6 +169,8 @@ contract OrganizationRegistry is ProtocolModuleUpgradeable, IOrganizationRegistr
         whenNotPaused
         onlyOrganizationAdmin(orgId)
     {
+        _requireNotRevoked(_s().organizations[orgId]);
+
         if (newAdmin == address(0)) {
             revert ZeroAddress();
         }
@@ -196,6 +207,8 @@ contract OrganizationRegistry is ProtocolModuleUpgradeable, IOrganizationRegistr
         OrganizationRegistryStorage storage $ = _s();
         Organization storage org = _requireExists(orgId);
 
+        _requireNotRevoked(org);
+
         address pending = $.pendingAdmin[orgId];
         if (pending == address(0)) {
             revert NoPendingAdminTransfer(orgId);
@@ -217,6 +230,8 @@ contract OrganizationRegistry is ProtocolModuleUpgradeable, IOrganizationRegistr
         whenNotPaused
         onlyOrganizationAdmin(orgId)
     {
+        _requireNotRevoked(_s().organizations[orgId]);
+
         if (operator == address(0)) {
             revert ZeroAddress();
         }
@@ -423,6 +438,19 @@ contract OrganizationRegistry is ProtocolModuleUpgradeable, IOrganizationRegistr
         Organization storage org = _requireExists(orgId);
         if (msg.sender != org.admin) {
             revert NotOrganizationAdmin(orgId, msg.sender);
+        }
+    }
+
+    /// @notice Reverts if the organization is terminally revoked.
+    /// @dev Applied uniformly to every administrative write (audit AAP-17). A revoked
+    ///      organization could previously still add operators and hand its record to
+    ///      another address. `isActingFor` returns false for any non-`VERIFIED` status
+    ///      so nothing escalated, but leaving live write paths on a terminal record is
+    ///      a trap for any future code that reads `operators` without re-checking.
+    /// @param org Storage pointer to the organization record.
+    function _requireNotRevoked(Organization storage org) private view {
+        if (org.status == OrganizationStatus.REVOKED) {
+            revert InvalidOrganizationTransition(OrganizationStatus.REVOKED, OrganizationStatus.REVOKED);
         }
     }
 

@@ -39,12 +39,24 @@ for all `(from, to)` pairs not in the legal set, the call reverts.
 | `PENDING` | `VERIFIED` | `ORG_VERIFIER_ROLE` |
 | `PENDING` | `REVOKED` | `ORG_VERIFIER_ROLE` |
 | `VERIFIED` | `SUSPENDED` | `ORG_VERIFIER_ROLE` |
+| `VERIFIED` | `SUSPENDED` | **the organization's own admin**, by changing `metadataHash` |
 | `SUSPENDED` | `VERIFIED` | `ORG_VERIFIER_ROLE` |
 | `VERIFIED` \| `SUSPENDED` | `REVOKED` | `PROTOCOL_ADMIN_ROLE` |
 
-`REVOKED` is terminal — no path leaves it. Revoking is restricted to
-`PROTOCOL_ADMIN_ROLE` (timelocked) because it permanently strips an organization's
-ability to act; suspension is the reversible tool for routine compliance action.
+`REVOKED` is terminal — no path leaves it, and every administrative write is refused on
+a revoked record, not merely the ones that would change its status (audit AAP-17).
+Revoking is restricted to `PROTOCOL_ADMIN_ROLE` (timelocked) because it permanently
+strips an organization's ability to act; suspension is the reversible tool for routine
+compliance action.
+
+**Self-demotion on metadata change.** `ORG_VERIFIER_ROLE` attests to a specific
+`metadataHash`. If a `VERIFIED` organization changes that hash it is demoted to
+`SUSPENDED` in the same transaction and `OrganizationRequiresReverification` is emitted,
+because the badge would otherwise sit over content the subject swapped after review —
+the classic verify-then-swap (audit AAP-11). Changing only the `uri` does **not** demote:
+the hash is what was attested, the URI is merely where it lives, so relocating a profile
+between gateways costs nothing. Revocation additionally frees the name hash for
+re-registration (AAP-05).
 
 **Effect on existing records:** suspending or revoking an organization does **not**
 invalidate assets it registered or maintenance it recorded. History is append-only.
@@ -328,9 +340,16 @@ by an unaccepted offer, so nothing is at risk while one sits idle.
 | `AWAITING_FUNDING` → `CANCELLED` | either party, or anyone after deadline | no funds moved |
 | `FUNDED` → `RELEASED` | buyer, or arbitrator from `DISPUTED` | asset → buyer, fee → treasury, remainder → seller, listing → `SOLD` |
 | `FUNDED` → `DISPUTED` | buyer or seller, before `settlementDeadline` | funds frozen |
-| `FUNDED` → `REFUNDED` | anyone, after `settlementDeadline` | buyer repaid in full, asset unmoved |
-| `DISPUTED` → `RELEASED`\|`REFUNDED` | `ARBITRATOR_ROLE` | exactly one of the two |
+| `FUNDED` → `REFUNDED` | anyone, after `settlementDeadline` (14d) | buyer repaid **less `TIMEOUT_PENALTY_BPS`**, which goes to the seller; asset unmoved |
+| `DISPUTED` → `RELEASED`\|`REFUNDED` | `ARBITRATOR_ROLE` | exactly one of the two; a refund here is in full |
 | `DISPUTED` → `REFUNDED` | anyone, after `DISPUTE_RESOLUTION_WINDOW` (14d) | buyer repaid in full, asset unmoved |
+
+**Only the buyer-fault path is penalised.** A funded buyer who lets the settlement
+deadline lapse forfeits 2% to the seller, who carried a locked and unsaleable asset for
+the whole window. Previously a full refund made this a costless option on the asset —
+exercise if it appreciated, walk if it did not (audit AAP-09). A refund the buyer did
+not cause — an arbitrator ruling for them, or arbitration never happening — returns the
+deposit in full, so a seller cannot manufacture a fee by disputing and then waiting.
 
 **Every non-terminal state is bounded by a deadline after which a permissionless call
 reaches a terminal state.** `AWAITING_FUNDING` by `fundingDeadline`, `FUNDED` by

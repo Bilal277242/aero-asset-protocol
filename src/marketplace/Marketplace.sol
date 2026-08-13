@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {IEscrowFactory} from "../interfaces/IEscrowFactory.sol";
+import {IFeeManager} from "../interfaces/IFeeManager.sol";
 import {ProtocolAddressKeys} from "../libraries/ProtocolAddressKeys.sol";
 import {ProtocolCast} from "../libraries/ProtocolCast.sol";
 import {UnexpectedCaller} from "../libraries/ProtocolErrors.sol";
@@ -38,7 +39,13 @@ contract Marketplace is ListingManager, OfferManager, ReentrancyGuardTransientUp
     ///         the buyer.
     /// @dev Bounds how long a seller's asset can sit locked by an unresponsive buyer.
     ///      Measured from acceptance, so it is known to both parties up front.
-    uint40 internal constant SETTLEMENT_WINDOW = 30 days;
+    ///
+    ///      Shortened from 30 days (audit AAP-09). The window exists to accommodate
+    ///      off-chain closing, not to give the buyer time to think: once funds are
+    ///      already escrowed, settlement is a signature. Every extra day was free
+    ///      optionality for the buyer paid for by the seller's locked asset. Paired
+    ///      with `Escrow.TIMEOUT_PENALTY_BPS`, which prices what remains.
+    uint40 internal constant SETTLEMENT_WINDOW = 14 days;
 
     /*//////////////////////////////////////////////////////////////
                               INITIALIZATION
@@ -120,8 +127,17 @@ contract Marketplace is ListingManager, OfferManager, ReentrancyGuardTransientUp
             revert AssetNotTransferable(assetId);
         }
 
+        // Re-checked here, not merely at listing time. De-allowlisting a token is the
+        // expected response to it being compromised or depegged, and without this an
+        // existing listing would keep opening escrows denominated in it (audit AAP-18).
+        IFeeManager fees = _fees();
+        fees.requireTokenAllowed(listing.paymentToken);
+
         uint128 price = offer.price;
-        uint128 feeAmount = _fees().quote(ProtocolFeeTypes.MARKETPLACE, price).toUint128();
+        uint128 feeAmount = fees.quote(ProtocolFeeTypes.MARKETPLACE, price).toUint128();
+        // Captured now, with every other economic parameter, rather than resolved at
+        // settlement where a treasury change could redirect an agreed trade (AAP-15).
+        address treasury = fees.treasury();
 
         // Effects before the external call.
         _writeOfferStatus(offerId, offer, OfferStatus.ACCEPTED);
@@ -134,6 +150,7 @@ contract Marketplace is ListingManager, OfferManager, ReentrancyGuardTransientUp
                     buyer: offer.buyer,
                     seller: listing.seller,
                     paymentToken: listing.paymentToken,
+                    treasury: treasury,
                     price: price,
                     feeAmount: feeAmount,
                     fundingDeadline: uint40(block.timestamp) + FUNDING_WINDOW,

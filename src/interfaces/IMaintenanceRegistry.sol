@@ -59,7 +59,10 @@ interface IMaintenanceRegistry {
     /// @param assetId The asset the work was performed on.
     /// @param performedByOrgId The MRO organization that performed it.
     /// @param documentId Supporting document, or 0 if none was registered.
-    /// @param performedAt Real-world date the work was performed.
+    /// @param performedAt Real-world date the work was **claimed** to be performed. A
+    ///        caller-supplied assertion, bounded only by not being in the future.
+    /// @param recordedAt Block timestamp when the record was written on-chain. The
+    ///        protocol's own observation, and the only date here it can vouch for.
     /// @param mType Category of maintenance event.
     /// @param recordHash Commitment to the full off-chain work package.
     struct MaintenanceRecord {
@@ -68,6 +71,7 @@ interface IMaintenanceRegistry {
         uint64 documentId;
         uint40 performedAt;
         MaintenanceType mType;
+        uint40 recordedAt;
         bytes32 recordHash;
     }
 
@@ -83,7 +87,10 @@ interface IMaintenanceRegistry {
     /// @param assetId The asset the work was performed on.
     /// @param performedByOrgId The MRO organization.
     /// @param mType Category of maintenance event.
-    /// @param performedAt Real-world date of the work.
+    /// @param performedAt Real-world date of the work, as claimed by the MRO.
+    /// @param recordedAt Block timestamp at which it was written on-chain. Emitted
+    ///        explicitly, rather than left implicit in the log, so the gap between the
+    ///        claimed and observed dates is a first-class field an indexer can filter on.
     /// @param credentialId The `MAINTENANCE_AUTHORITY` credential relied upon.
     /// @param documentId Supporting document, or 0.
     /// @param recordHash Commitment to the off-chain work package.
@@ -93,6 +100,7 @@ interface IMaintenanceRegistry {
         uint256 indexed performedByOrgId,
         MaintenanceType mType,
         uint40 performedAt,
+        uint40 recordedAt,
         uint256 credentialId,
         uint256 documentId,
         bytes32 recordHash
