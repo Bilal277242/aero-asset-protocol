@@ -96,6 +96,10 @@ slither . --config-file slither.config.json --fail-medium
 
 ## Deployment
 
+**Full runbook: [`docs/deploy.md`](docs/deploy.md).** It covers key custody, the anvil
+rehearsal, all eight stages, what `Verify` does and does not check, and mainnet
+differences. What follows is the summary.
+
 Copy `.env.example` to `.env` and fill it in first. `.env` is git-ignored and must never
 be committed.
 
@@ -132,6 +136,7 @@ are covered by CI rather than only exercised on a live chain.
 
 | Document | Contents |
 |---|---|
+| [`deploy.md`](docs/deploy.md) | **Deployment runbook** — key custody, staged rollout, verification |
 | [`architecture.md`](docs/architecture.md) | Layering, module boundaries, decisions D1–D8, call graph |
 | [`requirements.md`](docs/requirements.md) | FR/NFR catalogue, V1 scope gate, milestone map |
 | [`roles.md`](docs/roles.md) | Role catalogue, key custody, emergency runbook |

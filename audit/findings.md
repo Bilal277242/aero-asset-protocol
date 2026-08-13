@@ -30,8 +30,8 @@ differently, and may find whole classes of issue I am blind to.
 
 ## Remediation status
 
-**All four gates are complete. Every valid finding is closed** — 25 of 25, with 44
-regression tests across `test/audit/Gate{0,1,2,3}Regression.t.sol` running in CI.
+**Every valid finding is closed** — 26 of 26, with 51 regression tests across
+`test/audit/Gate{0,1,2,3,4}Regression.t.sol` running in CI.
 
 That is not the same as "the protocol is safe." See
 [What this audit did not cover](#what-this-audit-did-not-cover) at the end, and the
@@ -46,7 +46,21 @@ access to it that I do not.
 | 1 | AAP-05, AAP-06, AAP-07, AAP-08, AAP-10, AAP-14, AAP-24, AAP-25 | ✅ **remediated** |
 | 2 | AAP-09, AAP-11, AAP-12, AAP-15, AAP-17, AAP-18 | ✅ **remediated** |
 | 3 | AAP-16, AAP-19, AAP-20, AAP-21, AAP-22, AAP-23 | ✅ **remediated** |
+| 4 | **AAP-27** — raised after the gates, while writing `docs/deploy.md` | ✅ **remediated** |
 | — | **AAP-26** | ❌ **withdrawn — false positive** |
+
+### AAP-27 was found after the audit was declared closed
+
+Writing the deployment runbook meant re-reading `DeployCore` and `Verify` as an operator
+rather than as their author, and that surfaced a HIGH the whole audit missed: **the
+timelock's own configuration was never checked by anything.**
+
+It is the clearest evidence in this document for why the independence note above is not
+boilerplate. I audited these two files during Gate 0, extended `Verify` during Gates 0
+and 1, wrote AAP-14 specifically about `Verify` not constraining what matters, closed it,
+and still did not notice that the contract every other assertion defers to was itself
+unverified. What broke the pattern was changing the question from "is this correct?" to
+"how would someone actually run this?"
 
 ### Two Gate 2 fixes deliberately depart from the written recommendation
 
@@ -114,14 +128,15 @@ single point of failure is AAP-01's timeout fallback, which is implemented.
 | Severity | Valid | Fixed | Open |
 |---|---|---|---|
 | CRITICAL | 1 | 1 | 0 |
-| HIGH | 3 | 3 | 0 |
+| HIGH | 4 | 4 | 0 |
 | MEDIUM | 10 | 10 | 0 |
 | LOW | 5 | 5 | 0 |
 | INFORMATIONAL | 6 | 6 | 0 |
-| **Total** | **25** | **25** | **0** |
+| **Total** | **26** | **26** | **0** |
 
-One further finding (AAP-26) was reported and later withdrawn as a false positive, so 26
-were raised and 25 stand.
+One further finding (AAP-26) was reported and later withdrawn as a false positive, so 27
+were raised and 26 stand. AAP-27 was raised *after* the four gates closed, while writing
+the deployment runbook.
 
 No finding permitted an unprivileged attacker to **steal** funds. The severe ones were
 **permanent freezing of funds and permanent destruction of asset state** by an ordinary
@@ -143,6 +158,7 @@ A ✅ marks a remediated finding.
 | AAP-02 | HIGH | ✅  Seller can brick the asset mid-escrow and strand the deposit | `AssetRegistry` / `Escrow` |
 | AAP-03 | HIGH | ✅  `transferFrozen` is irreversible protocol-wide, with no recovery path | `AssetOwnership` |
 | AAP-04 | HIGH | ✅  Single-EOA arbitrator is a single point of total failure for disputed funds | `RoleManager` / deployment |
+| AAP-27 | HIGH | ✅ The timelock's own delay and proposer were never enforced or verified | `DeployCore` / `Verify` |
 | AAP-05 | MEDIUM | ✅ Rejecting a squatted organization does not free its name hash | `OrganizationRegistry` |
 | AAP-06 | MEDIUM | ✅ An installed component can be sold off its airframe | `ComponentRegistry` / `Marketplace` |
 | AAP-07 | MEDIUM | ✅ Document-hash uniqueness is global and permanent — cross-asset DoS | `DocumentRegistry` |
@@ -462,6 +478,111 @@ with a valid on-chain audit trail showing a legitimate arbitration.
 3. Ship AAP-01's timeout fallback so arbitration unavailability degrades to a refund
    rather than a freeze. This is the change that actually removes the single point of
    failure; 1 and 2 only reduce its likelihood.
+
+---
+
+## AAP-27 — The timelock's own delay and proposer were never enforced or verified
+
+- **Contract:** `script/DeployCore.s.sol`, `script/Verify.s.sol`
+- **Function:** `DeployCore.run()`, `Verify.verify()`
+- **Status:** ✅ **Confirmed by PoC** — 7 tests in `test/audit/Gate4Regression.t.sol`
+- **Raised:** after Gates 0–3 closed, while writing `docs/deploy.md`
+
+### Vulnerability
+
+Two independent gaps that compound.
+
+**1. The 48-hour floor was never enforced.**
+
+```solidity
+uint256 internal constant PRODUCTION_MIN_DELAY = 48 hours;
+...
+uint256 minDelay = vm.envOr("TIMELOCK_MIN_DELAY", PRODUCTION_MIN_DELAY);
+(address timelock,,) = deploy(deployer, proposer, minDelay);
+```
+
+`PRODUCTION_MIN_DELAY` is only the value used when the variable is **unset**. Setting
+`TIMELOCK_MIN_DELAY=0` deploys a zero-delay timelock — on any chain, including mainnet —
+and nothing rejects it. The constant's name, and the comment above it citing
+`docs/roles.md` §4, both read as though it were a floor.
+
+**2. `Verify` never looked at the timelock at all.**
+
+Every assertion in that script checks that power was handed *to* the timelock:
+`getRoleMemberCount(DEFAULT_ADMIN_ROLE) == 1`, the sole member is the timelock, the
+timelock holds `PROTOCOL_ADMIN_ROLE` and `FEE_MANAGER_ROLE`. Not one asked whether the
+timelock was worth handing power to — not its delay, not who may propose to it, not
+whether a standing admin could re-grant `PROPOSER_ROLE` without any delay.
+
+### Impact
+
+The timelock is the entire mitigation for `docs/threat-model.md` T-01, admin-key
+compromise, and the only thing standing between a compromised proposer key and an
+immediate malicious upgrade of `AssetOwnership` — which can rewrite the ownership of
+every aircraft in the protocol.
+
+A deployment with `TIMELOCK_MIN_DELAY=0`, or with a single EOA as proposer, **passes the
+entire verification gate**. Every document, including `README.md`, `docs/roles.md` and
+`ProtocolTimelock`'s own NatSpec, would continue to describe a protocol protected by a
+48-hour publicly-queued delay that does not exist.
+
+This is worse than having no verification: `Verify` is documented as the step that turns
+"the last contract was mined" into "the protocol is wired," so a pass manufactures
+confidence in precisely the property that is absent.
+
+### Attack scenario
+
+No attacker is needed for the first half. An operator sets `TIMELOCK_MIN_DELAY=0` while
+rehearsing on a testnet, copies the `.env` to production, and deploys. `Verify` passes.
+Monitoring is set up to watch the timelock queue, as the runbook requires — and it does
+watch, faithfully, an operation that executes in the same block it is queued.
+
+Later, the proposer multisig is phished. The attacker queues and immediately executes an
+upgrade of `AssetOwnership` to an implementation that reassigns every asset. The 48 hours
+in which the pauser was supposed to notice and halt the protocol do not exist.
+
+### Recommended remediation
+
+Applied in both places, because a floor enforced only by the deploying script is not a
+property of the deployment:
+
+```solidity
+// DeployCore.run — the opt-out is deliberately explicit and not chain-gated.
+if (minDelay < PRODUCTION_MIN_DELAY && !vm.envOr("ALLOW_SHORT_TIMELOCK_DELAY", false)) {
+    revert TimelockDelayTooShort(minDelay, PRODUCTION_MIN_DELAY);
+}
+```
+
+```solidity
+// Verify._verifyTimelock — runs first, since the timelock roots every other claim.
+_expect(timelock.getMinDelay() >= floor, "timelock delay below the production floor");
+_expect(expectedProposer != address(0), "no timelock proposer configured");
+_expect(timelock.hasRole(timelock.PROPOSER_ROLE(), expectedProposer), "proposer lacks PROPOSER_ROLE");
+_expect(expectedProposer.code.length != 0, "timelock proposer is an EOA");
+_expect(timelock.hasRole(timelock.EXECUTOR_ROLE(), address(0)), "execution is not permissionless");
+_expect(!timelock.hasRole(timelock.DEFAULT_ADMIN_ROLE(), expectedProposer), "proposer also holds timelock admin");
+```
+
+`Verify` duplicates the 48-hour constant rather than importing it from `DeployCore`: a
+verification pass that reads its threshold from the script being verified is checking its
+own homework.
+
+### Why the audit missed it
+
+Worth recording, because the mechanism is more useful than the finding.
+
+`DeployCore` and `Verify` were both read during Gate 0. `Verify` was *extended* in Gates
+0 and 1. **AAP-14 was specifically about `Verify` failing to constrain the roles that
+matter**, and closing it involved adding six assertions to that exact function — while
+the contract those assertions all defer to sat unexamined.
+
+Every pass asked "is this code correct?" The finding surfaced only when writing the
+runbook forced a different question: *"what does an operator actually have to check, and
+what checks it for them?"* Enumerating the manual steps made the gap obvious in about a
+minute.
+
+The generalizable lesson: reviewing a deployment script as code and reviewing it as a
+procedure find different defects, and this codebase had only ever had the first.
 
 ---
 

@@ -8,6 +8,7 @@ import {FeeManager} from "../src/fees/FeeManager.sol";
 import {ProtocolAddressKeys} from "../src/libraries/ProtocolAddressKeys.sol";
 import {ProtocolRoles} from "../src/libraries/ProtocolRoles.sol";
 import {DeploymentBase} from "./DeploymentBase.s.sol";
+import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
 
 /// @title Verify
 /// @author AeroAsset Protocol
@@ -21,6 +22,13 @@ import {DeploymentBase} from "./DeploymentBase.s.sol";
 ///      Every check here corresponds to a named invariant in `docs/invariants.md`.
 ///      A failure is a deployment defect, not a test failure.
 contract Verify is DeploymentBase {
+    /// @notice Minimum timelock delay expected on a production network.
+    /// @dev Mirrors `DeployCore.PRODUCTION_MIN_DELAY`. Duplicated rather than imported
+    ///      so this script asserts the property independently of the script that
+    ///      deployed it — a verification pass that trusts the deployer's constant is
+    ///      checking its own homework.
+    uint256 internal constant PRODUCTION_MIN_DELAY = 48 hours;
+
     /// @notice Thrown when a wiring invariant does not hold.
     /// @param what Which check failed.
     error VerificationFailed(string what);
@@ -28,12 +36,50 @@ contract Verify is DeploymentBase {
     /// @notice Asserts the full post-deployment configuration.
     /// @param a The deployed protocol addresses.
     /// @param expectedSettlementToken The token that must be allowlisted.
-    function verify(ProtocolAddresses memory a, address expectedSettlementToken) public view {
+    function verify(ProtocolAddresses memory a, address expectedSettlementToken, address expectedProposer) public view {
+        // Timelock first: it is the root of every other authority claim here, and a
+        // failure in it makes the rest moot rather than merely incomplete.
+        _verifyTimelock(a, expectedProposer);
         _verifyAddressBook(a);
         _verifyAdminHandover(a);
         _verifyMachineRoles(a);
         _verifyOperationalRoles(a);
         _verifyFees(a, expectedSettlementToken);
+    }
+
+    /// @notice The timelock itself is configured as governance, not as decoration.
+    /// @dev Audit AAP-27. Every other check here asserted that power had been handed
+    ///      *to* the timelock; none asserted the timelock was worth handing power to. A
+    ///      zero-delay timelock, or one proposed by a single EOA, passes every other
+    ///      assertion in this file while providing none of the protection the threat
+    ///      model credits it with (`docs/threat-model.md` T-01).
+    /// @param a The deployed protocol addresses.
+    /// @param expectedProposer The account that should hold `PROPOSER_ROLE`.
+    function _verifyTimelock(ProtocolAddresses memory a, address expectedProposer) private view {
+        TimelockController timelock = TimelockController(payable(a.protocolTimelock));
+
+        // The delay is the mitigation. Honours the same explicit opt-out as
+        // `DeployCore`, so a deliberately short testnet deployment still verifies —
+        // but an accidental one does not.
+        uint256 floor = vm.envOr("ALLOW_SHORT_TIMELOCK_DELAY", false) ? 0 : PRODUCTION_MIN_DELAY;
+        _expect(timelock.getMinDelay() >= floor, "timelock delay below the production floor");
+
+        // A delay only helps if queueing is restricted to an account whose compromise is
+        // itself hard. A single EOA proposer collapses the whole control to one key.
+        _expect(expectedProposer != address(0), "no timelock proposer configured");
+        _expect(timelock.hasRole(timelock.PROPOSER_ROLE(), expectedProposer), "proposer lacks PROPOSER_ROLE");
+        _expect(expectedProposer.code.length != 0, "timelock proposer is an EOA");
+
+        // Execution is intentionally permissionless: once an operation has survived the
+        // delay in public, restricting who submits it adds nothing.
+        _expect(timelock.hasRole(timelock.EXECUTOR_ROLE(), address(0)), "execution is not permissionless");
+
+        // A standing admin on the timelock could re-grant PROPOSER_ROLE without delay,
+        // which would route around the delay entirely. `DeployCore` passes address(0)
+        // as admin so only the timelock itself holds it.
+        _expect(
+            !timelock.hasRole(timelock.DEFAULT_ADMIN_ROLE(), expectedProposer), "proposer also holds timelock admin"
+        );
     }
 
     /// @notice Every module a peer resolves must be published and correct.
@@ -191,6 +237,6 @@ contract Verify is DeploymentBase {
 
     /// @notice Verifies a recorded deployment.
     function run() external view {
-        verify(_loadAll(), vm.envAddress("SETTLEMENT_TOKEN"));
+        verify(_loadAll(), vm.envAddress("SETTLEMENT_TOKEN"), vm.envAddress("PROTOCOL_ADMIN"));
     }
 }

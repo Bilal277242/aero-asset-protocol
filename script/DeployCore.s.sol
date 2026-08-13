@@ -18,9 +18,13 @@ import {DeploymentBase} from "./DeploymentBase.s.sol";
 ///      refuses to pass until that has happened.
 contract DeployCore is DeploymentBase {
     /// @notice Minimum timelock delay on a production network.
-    /// @dev `docs/roles.md` §4. Overridable by `TIMELOCK_MIN_DELAY` for testnets,
-    ///      where waiting two days between configuration steps helps nobody.
+    /// @dev `docs/roles.md` §4.
     uint256 internal constant PRODUCTION_MIN_DELAY = 48 hours;
+
+    /// @notice Thrown when the configured delay is below {PRODUCTION_MIN_DELAY}.
+    /// @param configured The delay that was requested.
+    /// @param floor The minimum permitted without an explicit opt-out.
+    error TimelockDelayTooShort(uint256 configured, uint256 floor);
 
     /// @notice Deploys the protocol core.
     /// @param deployer The account that temporarily holds `DEFAULT_ADMIN_ROLE`.
@@ -53,6 +57,20 @@ contract DeployCore is DeploymentBase {
         address deployer = msg.sender;
         address proposer = vm.envAddress("PROTOCOL_ADMIN");
         uint256 minDelay = vm.envOr("TIMELOCK_MIN_DELAY", PRODUCTION_MIN_DELAY);
+
+        // Audit AAP-27. `PRODUCTION_MIN_DELAY` was previously only the `envOr` default,
+        // so `TIMELOCK_MIN_DELAY=0` deployed a zero-delay timelock — on any network,
+        // silently, with every document still claiming a 48-hour delay protected the
+        // protocol. The timelock is the whole mitigation for admin-key compromise; a
+        // delay nobody waits for is not a weaker mitigation, it is none.
+        //
+        // The opt-out is deliberately awkward and deliberately not chain-gated: a
+        // shorter delay is legitimate for local rehearsal, and an operator who needs one
+        // elsewhere should have to say so in as many words rather than discover it by
+        // setting a number.
+        if (minDelay < PRODUCTION_MIN_DELAY && !vm.envOr("ALLOW_SHORT_TIMELOCK_DELAY", false)) {
+            revert TimelockDelayTooShort(minDelay, PRODUCTION_MIN_DELAY);
+        }
 
         _startBroadcast();
         (address timelock, address roleManager, address addressRegistry) = deploy(deployer, proposer, minDelay);

@@ -72,6 +72,9 @@ abstract contract BaseTest is Test {
         // code. Give the fixture code so tests exercise a compliant configuration.
         // `vm.prank` is unaffected by the callee having a body.
         vm.etch(arbitrator, hex"00");
+        // Audit AAP-27: the same requirement applies to the timelock proposer, which
+        // `FullLifecycle` supplies from this actor.
+        vm.etch(protocolAdmin, hex"00");
 
         treasury = _actor("treasury");
 

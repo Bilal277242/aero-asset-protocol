@@ -119,7 +119,7 @@ contract FullLifecycleTest is BaseTest {
     ///      "the protocol is actually wired". If this fails, the deployment is
     ///      defective regardless of what else passes.
     function test_DeploymentPassesVerification() public {
-        new Verify().verify(a, address(token));
+        new Verify().verify(a, address(token), protocolAdmin);
     }
 
     /// @notice The deployer has no residual power after the handover.
@@ -152,17 +152,17 @@ contract FullLifecycleTest is BaseTest {
         broken.marketplace = address(0xdead);
 
         vm.expectRevert(abi.encodeWithSelector(Verify.VerificationFailed.selector, "marketplace entry"));
-        verifier.verify(broken, address(token));
+        verifier.verify(broken, address(token), protocolAdmin);
 
         // A forgotten role grant is caught just as loudly as a wrong address.
         broken = a;
         broken.aircraftRegistry = address(0xbeef);
         vm.expectRevert(abi.encodeWithSelector(Verify.VerificationFailed.selector, "aircraftRegistry entry"));
-        verifier.verify(broken, address(token));
+        verifier.verify(broken, address(token), protocolAdmin);
 
         // So is an unlisted settlement token.
         vm.expectRevert(abi.encodeWithSelector(Verify.VerificationFailed.selector, "settlement token not allowlisted"));
-        verifier.verify(a, address(0xcafe));
+        verifier.verify(a, address(0xcafe), protocolAdmin);
     }
 
     /*//////////////////////////////////////////////////////////////
