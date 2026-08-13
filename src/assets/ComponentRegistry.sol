@@ -133,16 +133,27 @@ contract ComponentRegistry is ProtocolModuleUpgradeable, IComponentRegistry {
         }
 
         IAssetRegistry assets = IAssetRegistry(_resolve(ProtocolAddressKeys.ASSET_REGISTRY));
-        // The parent must be an airframe: components nest into aircraft, not into
-        // each other. `requireKind` also proves the parent exists.
+
+        // `exists` is kept ahead of `getAsset` so an unregistered parent still reverts
+        // `ParentNotAircraft` rather than `AssetNotFound` — callers depend on that, and
+        // narrowing four cross-contract calls to two (audit AAP-22) is not licence to
+        // change what the function reverts with.
         if (!assets.exists(parentAssetId)) {
             revert ParentNotAircraft(parentAssetId);
         }
-        if (assets.getAsset(parentAssetId).kind != IAssetRegistry.AssetKind.AIRCRAFT) {
+
+        // One read answers both remaining questions; previously `getAsset`, `isTerminal`
+        // and then `getAsset` again just to build the revert argument.
+        IAssetRegistry.Asset memory parent = assets.getAsset(parentAssetId);
+
+        // Components nest into aircraft, not into each other.
+        if (parent.kind != IAssetRegistry.AssetKind.AIRCRAFT) {
             revert ParentNotAircraft(parentAssetId);
         }
-        if (assets.isTerminal(parentAssetId)) {
-            revert IAssetRegistry.AssetTerminal(parentAssetId, assets.getAsset(parentAssetId).status);
+        if (
+            parent.status == IAssetRegistry.AssetStatus.RETIRED || parent.status == IAssetRegistry.AssetStatus.DESTROYED
+        ) {
+            revert IAssetRegistry.AssetTerminal(parentAssetId, parent.status);
         }
 
         // Fitting a part to an airframe changes both records, so the caller must own

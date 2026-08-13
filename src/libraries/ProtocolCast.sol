@@ -16,6 +16,19 @@ import {ValueTooLarge} from "./ProtocolErrors.sol";
 ///      OpenZeppelin's `SafeCast` does the same job but reverts with its own error
 ///      type. These helpers revert with the protocol's `ValueTooLarge`, so every
 ///      failure in the protocol decodes uniformly in a trace.
+///
+///      **Scope of the policy** (`docs/storage-model.md` §2), stated here because it was
+///      previously inferable only by reading every call site (audit AAP-21):
+///
+///      - **Caller-supplied values are always cast through this library.** They are the
+///        ones an attacker or a mistake can push out of range.
+///      - **`block.timestamp` is cast directly and deliberately.** It is not
+///        caller-supplied and cannot exceed `uint40` before the year 36812, so a checked
+///        cast would add a branch — on registration, transfer and settlement paths — for
+///        a condition that cannot arise.
+///
+///      The practical consequence is that `grep -rn 'uint40('` over `src/` is
+///      reviewable: every hit should be `block.timestamp`, and anything else is a bug.
 library ProtocolCast {
     /// @notice Narrows a `uint256` to `uint64`, reverting on overflow.
     /// @param value The value to narrow.

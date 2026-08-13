@@ -58,6 +58,13 @@ abstract contract MarketplaceBase is ProtocolModuleUpgradeable, IMarketplace {
     /// @notice Reports whether a listing is currently open for offers.
     /// @dev Checks stored status **and** elapsed time. Reading `status` alone would
     ///      treat a long-expired listing as live.
+    ///
+    ///      There is no "never expires" case: {ListingManager.createListing} rejects any
+    ///      `expiresAt` at or before `block.timestamp`, which rejects zero, and no path
+    ///      rewrites the field afterwards. An earlier `expiresAt == 0 ||` disjunct here
+    ///      was therefore unreachable (audit AAP-20). Perpetual listings would also
+    ///      contradict `MAX_LISTING_DURATION`, which exists to stop a stale listing
+    ///      holding an asset's only active slot indefinitely.
     /// @param listingId The listing id.
     /// @return True if the listing is `ACTIVE` and unexpired.
     function isListingActive(uint256 listingId) public view returns (bool) {
@@ -65,12 +72,19 @@ abstract contract MarketplaceBase is ProtocolModuleUpgradeable, IMarketplace {
         if (listing.status != ListingStatus.ACTIVE) {
             return false;
         }
-        return listing.expiresAt == 0 || listing.expiresAt > block.timestamp;
+        return listing.expiresAt > block.timestamp;
     }
 
     /// @notice Reports whether an offer is currently acceptable.
     /// @dev Requires the offer itself to be live; the listing is checked separately by
     ///      the caller, since an offer can outlive the listing it targets.
+    ///
+    ///      As with listings, there is no non-expiring case — {OfferManager.makeOffer}
+    ///      rejects zero along with every other past deadline.
+    ///
+    ///      Note that `CredentialRegistry.isValid` keeps its `expiresAt == 0` disjunct:
+    ///      there the zero case is genuinely reachable, because a credential may be
+    ///      issued without an expiry.
     /// @param offerId The offer id.
     /// @return True if the offer is `ACTIVE` and unexpired.
     function isOfferActive(uint256 offerId) public view returns (bool) {
@@ -78,7 +92,7 @@ abstract contract MarketplaceBase is ProtocolModuleUpgradeable, IMarketplace {
         if (offer.status != OfferStatus.ACTIVE) {
             return false;
         }
-        return offer.expiresAt == 0 || offer.expiresAt > block.timestamp;
+        return offer.expiresAt > block.timestamp;
     }
 
     /// @notice Reports whether a listing transition is permitted.

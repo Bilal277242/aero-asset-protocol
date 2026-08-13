@@ -26,9 +26,20 @@ import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/Reentrancy
 ///
 ///      Security properties, in the order they matter:
 ///
-///      1. **Checks-effects-interactions, without exception.** Status is written to
-///         its terminal value *before* any transfer, so a reentrant call fails the
-///         state-machine guard on its own, before the reentrancy guard is reached.
+///      1. **Status reaches its terminal value before any transfer.** A reentrant call
+///         therefore fails the state-machine guard on its own, before the reentrancy
+///         guard is reached.
+///
+///         This is deliberately narrower than "checks-effects-interactions without
+///         exception", which an earlier version of this comment claimed and the code
+///         does not satisfy (audit AAP-16). Two places order an interaction ahead of an
+///         effect, both unavoidably: {fund} must call `transferFrom` before it can
+///         measure what arrived, and {_payout} cannot know a transfer failed until it
+///         has attempted it. Each is safe for a reason stated at the site.
+///
+///         The claim is corrected rather than quietly dropped because an absolute
+///         security assertion the code does not meet is worse than no assertion: it
+///         teaches a reviewer to trust the comments instead of reading the function.
 ///      2. **`ReentrancyGuardTransient`** on every fund-moving function, as a second
 ///         independent layer (EIP-1153; ~2.1k gas cheaper than the storage guard).
 ///      3. **Measured balance deltas.** `depositedAmount` is what the escrow actually
@@ -182,6 +193,13 @@ contract Escrow is IEscrow, Initializable, ReentrancyGuardTransient {
 
         IERC20 token = IERC20(terms.paymentToken);
 
+        // **Interaction before effect, unavoidably** (audit AAP-16): the balance delta
+        // cannot be measured without first making the transfer, so `status` and
+        // `depositedAmount` are written after it. What makes that safe is not ordering
+        // but the pair of guards around it — `nonReentrant` above, and a status that is
+        // still `AWAITING_FUNDING` throughout, which every reentrant entry point either
+        // shares the guard with or fails its own precondition against.
+        //
         // Measure what actually arrives. A token that delivers less than requested
         // leaves the escrow unable to reach FUNDED, which is strictly better than
         // discovering the shortfall when the seller is paid.
@@ -315,16 +333,20 @@ contract Escrow is IEscrow, Initializable, ReentrancyGuardTransient {
             revert InvalidEscrowTransition(status, releaseToSeller ? EscrowStatus.RELEASED : EscrowStatus.REFUNDED);
         }
 
-        emit DisputeResolved(escrowId, msg.sender, releaseToSeller);
-
         // The arbitrator chooses a winner and nothing else: it cannot alter amounts,
         // pay a third party, or reach a non-disputed escrow. A ruling for the buyer
         // refunds in full — the arbitrator found they were not at fault.
+        //
+        // `DisputeResolved` is emitted after the settlement it authorized, so the log
+        // reads in causal order rather than announcing an outcome before the state
+        // change that produced it (audit AAP-23).
         if (releaseToSeller) {
             _settle();
         } else {
             _refund(0);
         }
+
+        emit DisputeResolved(escrowId, msg.sender, releaseToSeller);
     }
 
     /*//////////////////////////////////////////////////////////////

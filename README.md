@@ -4,11 +4,16 @@ Blockchain infrastructure for aviation assets — a verified asset registry, dig
 asset passport, maintenance and document proofs, ownership tracking, marketplace and
 escrow.
 
-> **Status: Phase 9 complete** — all five layers are implemented and tested, the 18
-> protocol invariants are executable rather than aspirational, and the protocol deploys
-> from staged scripts into a timelock-governed configuration that a verification script
-> asserts on-chain. Remaining: a live testnet run, then an independent audit. This is
-> not audited software and must not be used with real funds.
+> **Status: internally audited and remediated** — all five layers are implemented and
+> tested, the 18 protocol invariants are executable rather than aspirational, the
+> protocol deploys from staged scripts into a timelock-governed configuration that a
+> verification script asserts on-chain, and all 25 valid findings from the internal
+> audit are closed with regression tests in CI.
+>
+> **That is not an audit.** The review in [`audit/`](audit/) was performed by the same
+> agent that wrote the code, and its two most severe findings were design decisions that
+> same agent had written and defended before catching them. An independent human audit
+> remains a hard gate. This is not audited software and must not be used with real funds.
 
 ---
 
@@ -146,13 +151,24 @@ are covered by CI rather than only exercised on a live chain.
 
 1. Timelock compromise is a total compromise of the L1–L3 registries. Bounded by a ≥48h
    delay, multisig custody and queue monitoring — mitigated, not eliminated.
-2. Dispute arbitration is centralized (roadmap §13, deliberate for V1).
+2. Dispute arbitration is centralized (roadmap §13, deliberate for V1). Bounded since
+   audit AAP-01: an unresolved dispute refunds the buyer permissionlessly after
+   `DISPUTE_RESOLUTION_WINDOW`, so an absent arbitrator delays a trade rather than
+   freezing the deposit.
 3. Hashed serial numbers and tail numbers are **commitments, not encryption**, and are
-   brute-forceable unless the caller salts the preimage.
-4. Name-hash squatting on `PENDING` organizations is possible; squatted records can do
-   nothing and can be revoked.
+   brute-forceable unless the caller salts the preimage. Squatting a serial is
+   recoverable — `PROTOCOL_ADMIN_ROLE` can release the index entry behind the timelock
+   (AAP-08) — but the confidentiality caveat stands regardless.
+4. **Griefing is bounded but not priced.** Remediation removed the permanence of every
+   griefing outcome; it did not make griefing cost anything. Apart from the escrow
+   timeout penalty, each attack still costs an attacker one transaction's gas. Bonds are
+   proposed but unimplemented — `audit/economic-review.md` §7.
 5. Passport reads require pagination for assets with very many documents.
-6. Off-chain data availability is out of scope.
+6. Off-chain data availability is out of scope. Every on-chain guarantee here is
+   conditional on it.
+7. Maintenance `performedAt` is a caller's claim the protocol cannot verify. Backdating
+   is made **visible** via `recordedAt`, not prevented — historical backfill is a
+   legitimate use case (AAP-12).
 
 ---
 
@@ -173,8 +189,8 @@ are covered by CI rather than only exercised on a live chain.
 | 10 | Internal audit — 26 findings raised, 25 valid | ✅ |
 | 10a | Gate 0 — permanent fund/state loss (CRITICAL + all HIGH) | ✅ |
 | 10b | Gate 1 — identifier burns, `via_ir`, Slither made blocking | ✅ |
-| 10c | Gate 2 — economic + data integrity | ⬜ |
-| 10d | Gate 3 — housekeeping | ⬜ |
+| 10c | Gate 2 — economic + data integrity | ✅ |
+| 10d | Gate 3 — housekeeping | ✅ all 25 findings closed |
 | 9b | Sepolia deploy + verify | ⬜ needs your RPC + funded key |
 
 The audit lives in [`audit/`](audit/): five domain reviews plus

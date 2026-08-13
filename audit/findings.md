@@ -30,16 +30,22 @@ differently, and may find whole classes of issue I am blind to.
 
 ## Remediation status
 
-**Gates 0, 1 and 2 are complete.** Nineteen findings are fixed, with 39 regression tests
-across `test/audit/Gate{0,1,2}Regression.t.sol` running in CI. Only Gate 3 —
-housekeeping — remains open.
+**All four gates are complete. Every valid finding is closed** — 25 of 25, with 44
+regression tests across `test/audit/Gate{0,1,2,3}Regression.t.sol` running in CI.
+
+That is not the same as "the protocol is safe." See
+[What this audit did not cover](#what-this-audit-did-not-cover) at the end, and the
+independence note above. The most severe findings here — a `DISPUTED` state with no
+exit, and an irreversible freeze — were design decisions I wrote, defended in prose, and
+only caught on a second pass. A reviewer who did not write this code has a class of
+access to it that I do not.
 
 | Gate | Findings | Status |
 |---|---|---|
 | 0 | AAP-01, AAP-02, AAP-03, AAP-04, AAP-13 | ✅ **remediated** |
 | 1 | AAP-05, AAP-06, AAP-07, AAP-08, AAP-10, AAP-14, AAP-24, AAP-25 | ✅ **remediated** |
 | 2 | AAP-09, AAP-11, AAP-12, AAP-15, AAP-17, AAP-18 | ✅ **remediated** |
-| 3 | AAP-16, AAP-19, AAP-20, AAP-21, AAP-22, AAP-23 | ⬜ open |
+| 3 | AAP-16, AAP-19, AAP-20, AAP-21, AAP-22, AAP-23 | ✅ **remediated** |
 | — | **AAP-26** | ❌ **withdrawn — false positive** |
 
 ### Two Gate 2 fixes deliberately depart from the written recommendation
@@ -110,22 +116,24 @@ single point of failure is AAP-01's timeout fallback, which is implemented.
 | CRITICAL | 1 | 1 | 0 |
 | HIGH | 3 | 3 | 0 |
 | MEDIUM | 10 | 10 | 0 |
-| LOW | 5 | 3 | 2 |
-| INFORMATIONAL | 6 | 2 | 4 |
-| **Total** | **25** | **19** | **6** |
+| LOW | 5 | 5 | 0 |
+| INFORMATIONAL | 6 | 6 | 0 |
+| **Total** | **25** | **25** | **0** |
 
 One further finding (AAP-26) was reported and later withdrawn as a false positive, so 26
 were raised and 25 stand.
-
-**Every CRITICAL, HIGH and MEDIUM finding is closed.** What remains is six items rated
-LOW or INFORMATIONAL: two documentation/semantics corrections (AAP-16, AAP-19) and four
-housekeeping items (AAP-20 dead branches, AAP-21 cast-policy consistency, AAP-22 call
-coalescing, AAP-23 event ordering). None affects funds, state or authorization.
 
 No finding permitted an unprivileged attacker to **steal** funds. The severe ones were
 **permanent freezing of funds and permanent destruction of asset state** by an ordinary
 counterparty — reachable because the state machines allowed it by construction, and now
 closed.
+
+**What the remediation did and did not change.** Each fix removed the *permanence* of an
+outcome: a frozen deposit now times out, a burned identifier is now recoverable, a
+bricked asset is now prevented. Almost none of it made griefing *cost* anything — every
+attack in this catalogue still prices at one transaction's gas for the attacker, with
+`TIMEOUT_PENALTY_BPS` the single exception. Bonds would close that gap and are not
+implemented; see `economic-review.md` §7 item 5.
 
 A ✅ marks a remediated finding.
 
@@ -146,14 +154,14 @@ A ✅ marks a remediated finding.
 | AAP-13 | MEDIUM | ✅  Blacklistable settlement token can permanently brick the refund path | `Escrow` |
 | AAP-14 | MEDIUM | ✅ `Verify.s.sol` does not constrain operational role holders | `script/Verify.s.sol` |
 | AAP-15 | LOW | ✅ Treasury resolved at settlement, not captured at acceptance | `Escrow` / `FeeManager` |
-| AAP-16 | LOW | `fund()` performs an interaction before its effects, contradicting its NatSpec | `Escrow` |
+| AAP-16 | LOW | ✅ `fund()` performs an interaction before its effects, contradicting its NatSpec | `Escrow` |
 | AAP-17 | LOW | ✅ Revoked organization's admin retains operator and admin-transfer powers | `OrganizationRegistry` |
 | AAP-18 | LOW | ✅ Token allowlist is checked at listing but never re-checked at acceptance | `Marketplace` |
-| AAP-19 | LOW | Seller can front-run `withdrawOffer` with `acceptOffer` | `Marketplace` |
-| AAP-20 | INFORMATIONAL | Unreachable `expiresAt == 0` branches in four contracts | `Marketplace` |
-| AAP-21 | INFORMATIONAL | Raw `uint40(block.timestamp)` casts bypass the `ProtocolCast` policy | multiple |
-| AAP-22 | INFORMATIONAL | `installComponent` makes four redundant external calls | `ComponentRegistry` |
-| AAP-23 | INFORMATIONAL | Event ordering in `settleTransfer` and `resolveDispute` | `AssetOwnership` / `Escrow` |
+| AAP-19 | LOW | ✅ Seller can front-run `withdrawOffer` with `acceptOffer` | `Marketplace` |
+| AAP-20 | INFORMATIONAL | ✅ Unreachable `expiresAt == 0` branches in four contracts | `Marketplace` |
+| AAP-21 | INFORMATIONAL | ✅ Raw `uint40(block.timestamp)` casts bypass the `ProtocolCast` policy | multiple |
+| AAP-22 | INFORMATIONAL | ✅ `installComponent` makes four redundant external calls | `ComponentRegistry` |
+| AAP-23 | INFORMATIONAL | ✅ Event ordering in `settleTransfer` and `resolveDispute` | `AssetOwnership` / `Escrow` |
 | AAP-24 | INFORMATIONAL | ✅ Slither has never been executed against this codebase | process |
 | AAP-25 | INFORMATIONAL | ✅ `ORG_VERIFIER_ROLE` and `ASSET_VERIFIER_ROLE` collapse to one key | `ConfigureProtocol` |
 | AAP-26 | ~~INFO~~ | ❌ withdrawn — OpenZeppelin submodule pinned to an untagged commit | `.gitmodules` |

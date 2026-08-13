@@ -37,7 +37,10 @@ consequences.
 
 - Custom errors only. No `require`-with-string in `src/`.
 - Emit an event for every state change, sufficient to reconstruct state off-chain.
-- Checks-effects-interactions, without exception on fund-moving paths.
+- Checks-effects-interactions on fund-moving paths. Where an interaction genuinely must
+  precede an effect — measuring a balance delta, or learning that a transfer failed —
+  say so at the site and state what makes it safe instead. Do not claim "without
+  exception" unless it holds; see audit AAP-16.
 - Reentrancy guards (`ReentrancyGuardTransient`) on every function that moves value.
 - No unbounded loop in any state-changing function. Array indexes are `view`-read only.
 - Explicit access control on every non-`view` external function.
@@ -104,8 +107,8 @@ valuation, DeFi yield, decentralized arbitration, on-chain document storage.
 | 10 | Internal audit (`audit/`) — 26 findings raised, 25 valid | ✅ complete |
 | 10a | Gate 0 remediation — permanent fund/state loss | ✅ complete |
 | 10b | Gate 1 remediation — identifier burns, `via_ir`, Slither | ✅ complete |
-| 10c | Gate 2 remediation — economic + data integrity | ⬜ AAP-09, 11, 12, 15, 17, 18 |
-| 10d | Gate 3 remediation — housekeeping | ⬜ AAP-16, 19, 20, 21, 22, 23 |
+| 10c | Gate 2 remediation — economic + data integrity | ✅ complete |
+| 10d | Gate 3 remediation — housekeeping | ✅ complete — all 25 findings closed |
 | 9b | Sepolia deploy + verify | ⬜ needs RPC + funded key |
 
 ## Audit

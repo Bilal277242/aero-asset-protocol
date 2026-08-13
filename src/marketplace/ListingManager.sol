@@ -133,7 +133,8 @@ abstract contract ListingManager is MarketplaceBase {
         if (listing.status != ListingStatus.ACTIVE) {
             revert ListingNotActive(listingId, listing.status);
         }
-        if (listing.expiresAt == 0 || listing.expiresAt > block.timestamp) {
+        // No `expiresAt == 0` case: {createListing} rejects it. See `isListingActive`.
+        if (listing.expiresAt > block.timestamp) {
             revert ListingNotExpired(listingId, listing.expiresAt);
         }
 

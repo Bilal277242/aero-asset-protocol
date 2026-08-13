@@ -274,9 +274,14 @@ contract AssetOwnership is ProtocolModuleUpgradeable, IAssetOwnership {
         }
 
         record.lockedBy = address(0);
-        _moveOwnership(assetId, record, to, REASON_SETTLEMENT);
 
+        // Emitted in causal order: the lock is released, *then* ownership moves. The
+        // reverse order made a naive log-order reconstruction report a transfer that
+        // happened while the asset was still locked — a state that never existed
+        // (audit AAP-23).
         emit TransferLockChanged(assetId, address(0), msg.sender);
+
+        _moveOwnership(assetId, record, to, REASON_SETTLEMENT);
     }
 
     /*//////////////////////////////////////////////////////////////

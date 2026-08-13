@@ -69,6 +69,19 @@ abstract contract OfferManager is MarketplaceBase {
     /// @notice Withdraws an offer.
     /// @dev Callable by the buyer at any time while the offer is active. A buyer is
     ///      never locked into a bid they have not funded.
+    ///
+    ///      **An offer is binding until withdrawn, and withdrawal is not guaranteed to
+    ///      win a race with acceptance.** A pending `withdrawOffer` is visible in the
+    ///      mempool, so a seller can front-run it with {Marketplace.acceptOffer} and
+    ///      force the offer to `ACCEPTED` (audit AAP-19). This is accepted behaviour
+    ///      rather than a defect, and it is documented here because silence made it
+    ///      look like an oversight.
+    ///
+    ///      The exposure is bounded: an offer carries no funds, so the buyer's remedy is
+    ///      simply not to call `fund`. Either party may then `cancel` the escrow
+    ///      immediately, and anyone may once `fundingDeadline` passes. The buyer loses
+    ///      gas; the seller gains nothing and has burned their listing's escrow slot for
+    ///      as long as they leave it open.
     /// @param offerId The offer to withdraw.
     function withdrawOffer(uint256 offerId) external whenNotPaused {
         Offer storage offer = _requireOffer(offerId);
@@ -104,7 +117,8 @@ abstract contract OfferManager is MarketplaceBase {
         if (offer.status != OfferStatus.ACTIVE) {
             revert OfferNotActive(offerId, offer.status);
         }
-        if (offer.expiresAt == 0 || offer.expiresAt > block.timestamp) {
+        // No `expiresAt == 0` case: {makeOffer} rejects it. See `isOfferActive`.
+        if (offer.expiresAt > block.timestamp) {
             revert OfferNotExpired(offerId, offer.expiresAt);
         }
 
