@@ -317,21 +317,32 @@ by an unaccepted offer, so nothing is at risk while one sits idle.
     ┌─────────┼──────────────────────┬─────────────────────┐
     │         │                      │                     │
     │ release()               raiseDispute()      claimTimeout()
-    │ (buyer, or both parties)  (buyer|seller)  (anyone, after
-    │                                │           settlementDeadline)
+    │ (buyer ONLY)             (buyer|seller,     (anyone, after
+    │                          before settlement   settlementDeadline;
+    │                          deadline)           2% to the seller)
     ▼                                ▼                     ▼
 ┌──────────┐                  ┌──────────┐          ┌──────────┐
 │ RELEASED │                  │ DISPUTED │          │ REFUNDED │
 │(terminal)│                  └────┬─────┘          │(terminal)│
 └──────────┘                       │                └──────────┘
-                        resolve(ARBITRATOR_ROLE)
-                                   │
                      ┌─────────────┴─────────────┐
-                     ▼                           ▼
-               ┌──────────┐                ┌──────────┐
-               │ RELEASED │                │ REFUNDED │
-               └──────────┘                └──────────┘
+        resolveDispute(ARBITRATOR_ROLE)   claimDisputeTimeout()
+                     │                     (anyone, after
+                     │                      DISPUTE_RESOLUTION_WINDOW)
+         ┌───────────┴───────────┐                 │
+         ▼                       ▼                 ▼
+   ┌──────────┐            ┌──────────┐      ┌──────────┐
+   │ RELEASED │            │ REFUNDED │      │ REFUNDED │
+   └──────────┘            └──────────┘      │ (in full)│
+                                             └──────────┘
 ```
+
+**`release()` is buyer-only.** `Escrow.release` reverts `NotEscrowBuyer` for anyone else,
+including the seller. A seller who wants out of a funded trade either waits for the buyer,
+raises a dispute, or waits out `settlementDeadline` and collects the timeout penalty —
+there is no seller-side release. An earlier revision of this diagram read
+"buyer, or both parties", which would have led a frontend to ship a seller "Release"
+button that always reverts.
 
 | Transition | Caller | Effects |
 |---|---|---|
