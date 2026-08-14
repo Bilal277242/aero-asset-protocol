@@ -94,3 +94,72 @@ jobs:
         with:
           fail-on: medium
           slither-args: --filter-paths "lib/|test/|script/"
+
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # Needed only for the drift check below: the generated bindings are derived
+      # from `out/`, so verifying them means having a real build to derive from.
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      # The ESLint containment boundary is a correctness control, not a style
+      # preference, and it has already failed silently once: `eslint-config-next`
+      # pulled in a patch that crashed on ESLint 9, `next build` printed the crash
+      # as a warning and carried on, and the rules were dead while everything
+      # stayed green. This test asserts a violation fixture is actually rejected
+      # AND that the config loads at all.
+      - name: Boundary rule fires
+        run: npm run test:lint
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      # Regenerating from `out/` must reproduce exactly what is committed.
+      # Without this, a contract change plus a forgotten `npm run codegen` points
+      # the app at an ABI the chain no longer has — and the failure surfaces as a
+      # decoding error three screens deep, not at build time.
+      #
+      # The address book is excluded: it derives from `deployments/`, which is
+      # git-ignored and absent here. Runtime drift is caught instead by resolving
+      # every module through `ProtocolAddressRegistry` at boot.
+      - name: Build contracts for codegen
+        working-directory: .
+        run: forge build
+
+      - name: Bindings match the contracts
+        run: |
+          npm run codegen
+          git diff --exit-code -- src/generated/abis src/generated/enums.ts src/generated/errors.ts
+
+      - name: Production build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_AAP_CHAIN_ID: 11155111
+          NEXT_PUBLIC_AAP_RPC_URL: https://ethereum-sepolia-rpc.publicnode.com
+          NEXT_PUBLIC_AAP_ADDRESS_REGISTRY: "0xc9cf5998604A65e2C115476b7D165CB7A68e6224"
+          NEXT_PUBLIC_AAP_SETTLEMENT_TOKEN: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
