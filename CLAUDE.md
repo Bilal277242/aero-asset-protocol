@@ -13,6 +13,11 @@ Foundry lives at `~/.foundry/bin` inside WSL and is **not** on the Windows `PATH
 always run `forge` from WSL. `.gitattributes` forces LF endings; do not disable it, or
 `forge fmt --check` will fail in CI while passing locally.
 
+**`web/` is the exception: run npm from Windows, not WSL.** `npm install` against the
+DrvFs mount hangs indefinitely without writing a file. Foundry from WSL, npm from
+Windows PowerShell — and never run `next build` while `next dev` is serving, because
+they share `.next` and the dev server ends up executing production chunks.
+
 ## Stack
 
 Solidity `0.8.28` (pinned) · Foundry · OpenZeppelin `v5.4.0` · EVM target `cancun`.
@@ -109,7 +114,28 @@ valuation, DeFi yield, decentralized arbitration, on-chain document storage.
 | 10b | Gate 1 remediation — identifier burns, `via_ir`, Slither | ✅ complete |
 | 10c | Gate 2 remediation — economic + data integrity | ✅ complete |
 | 10d | Gate 3 remediation — housekeeping | ✅ complete — all 25 findings closed |
-| 9b | Sepolia deploy + verify | ⬜ needs RPC + funded key |
+| 9b | Sepolia deploy + verify | ✅ complete — chain 11155111, all 25 contracts verified |
+| 10e | AAP-27 (runbook) and AAP-28/29/30 (live deploy) | ✅ complete — 29 findings stand, all closed |
+
+### Web UI (`web/`)
+
+A separate track, planned independently of the contract phases. Nothing under `web/`
+may change anything in `src/`.
+
+| Phase | Scope | Status |
+|---|---|---|
+| W0 | Scaffold, codegen, address book + drift banner, `/status` | ✅ complete |
+| W1 | `/assets/[assetId]` passport, bytes32 decoding, non-claims, local file verification | ✅ complete |
+| W2 | Domain layer for listings, chain clock, `/market` + listing detail | ⬜ |
+| W3 | Wallet, `useTxFlow`, `explainError`, `/portfolio`, first write (`makeOffer`) | ⬜ |
+| W4 | `acceptOfferFlow`, `/trades`, `deriveEscrowActions`, `buyFlow`, release | ⬜ |
+| W5 | Disputes, `claimTimeout` penalty breakdown, deferred payouts, `/arbitrate` | ⬜ |
+| W6 | `createListingFlow` precondition checklist, cancel, permissionless expiry | ⬜ |
+| W7 | Error copy, a11y, mobile, RPC-failure resilience, Playwright | ⬜ |
+
+The UI's central correctness rule: **listings, offers and credentials store a `status`
+that goes stale**, so nothing outside `web/src/lib/domain/` may read a raw status. The
+ESLint boundary enforces it and `web/test/lint/boundary.test.ts` asserts the rule fires.
 
 ## Audit
 

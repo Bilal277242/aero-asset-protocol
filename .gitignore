@@ -21,6 +21,9 @@ coverage/
 .idea/
 *.swp
 
+# Per-machine agent settings. `.claude/launch.json` is shared and committed.
+.claude/settings.local.json
+
 # Node (future frontend)
 node_modules/
 
