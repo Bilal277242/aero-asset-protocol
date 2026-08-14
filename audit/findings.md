@@ -30,8 +30,8 @@ differently, and may find whole classes of issue I am blind to.
 
 ## Remediation status
 
-**Every valid finding is closed** — 26 of 26, with 51 regression tests across
-`test/audit/Gate{0,1,2,3,4}Regression.t.sol` running in CI.
+**Every valid finding is closed** — 29 of 29, with 52 regression tests across
+`test/audit/Gate{0,1,2,3,4,5}Regression.t.sol` running in CI.
 
 That is not the same as "the protocol is safe." See
 [What this audit did not cover](#what-this-audit-did-not-cover) at the end, and the
@@ -47,7 +47,25 @@ access to it that I do not.
 | 2 | AAP-09, AAP-11, AAP-12, AAP-15, AAP-17, AAP-18 | ✅ **remediated** |
 | 3 | AAP-16, AAP-19, AAP-20, AAP-21, AAP-22, AAP-23 | ✅ **remediated** |
 | 4 | **AAP-27** — raised after the gates, while writing `docs/deploy.md` | ✅ **remediated** |
+| 5 | **AAP-28, AAP-29, AAP-30** — raised by the live Sepolia deployment | ✅ **remediated** |
 | — | **AAP-26** | ❌ **withdrawn — false positive** |
+
+### Three more found by actually deploying
+
+The Sepolia deployment surfaced three defects in a single session, **all of them in the
+scripts' `run()` entry points, none reachable by any test.** One of them handed the
+protocol's authorization root to an address with no known private key while every
+transaction succeeded and every log looked healthy.
+
+The common cause is stated once here because it is the useful part:
+`test/integration/FullLifecycle.t.sol` calls each stage's `deploy(...)` function
+directly, with explicit arguments. It never calls `run()`. Everything that lives only in
+`run()` — the broadcast wiring, the `msg.sender` read, every line of artifact file I/O —
+had **zero coverage**, in a repository that otherwise sits at 99% line coverage and
+describes that very test as exercising "the *real* deployment path."
+
+It exercises the contract half. The operational half, which decides who ends up owning
+the protocol, had never executed outside a live network.
 
 ### AAP-27 was found after the audit was declared closed
 
@@ -128,15 +146,16 @@ single point of failure is AAP-01's timeout fallback, which is implemented.
 | Severity | Valid | Fixed | Open |
 |---|---|---|---|
 | CRITICAL | 1 | 1 | 0 |
-| HIGH | 4 | 4 | 0 |
-| MEDIUM | 10 | 10 | 0 |
+| HIGH | 5 | 5 | 0 |
+| MEDIUM | 12 | 12 | 0 |
 | LOW | 5 | 5 | 0 |
 | INFORMATIONAL | 6 | 6 | 0 |
-| **Total** | **26** | **26** | **0** |
+| **Total** | **29** | **29** | **0** |
 
 One further finding (AAP-26) was reported and later withdrawn as a false positive, so 27
-were raised and 26 stand. AAP-27 was raised *after* the four gates closed, while writing
-the deployment runbook.
+were raised and 29 stand. AAP-27 was raised while writing the deployment runbook;
+AAP-28 through AAP-30 were raised by the live Sepolia deployment, after the audit had
+been declared closed twice.
 
 No finding permitted an unprivileged attacker to **steal** funds. The severe ones were
 **permanent freezing of funds and permanent destruction of asset state** by an ordinary
@@ -159,6 +178,9 @@ A ✅ marks a remediated finding.
 | AAP-03 | HIGH | ✅  `transferFrozen` is irreversible protocol-wide, with no recovery path | `AssetOwnership` |
 | AAP-04 | HIGH | ✅  Single-EOA arbitrator is a single point of total failure for disputed funds | `RoleManager` / deployment |
 | AAP-27 | HIGH | ✅ The timelock's own delay and proposer were never enforced or verified | `DeployCore` / `Verify` |
+| AAP-28 | HIGH | ✅ `run()` seeded protocol admin from `msg.sender`, bricking the deployment | deployment scripts |
+| AAP-29 | MEDIUM | ✅ `fs_permissions` declared `./deployments` twice, blocking every deployment | `foundry.toml` |
+| AAP-30 | MEDIUM | ✅ A failed broadcast left an artifact full of simulation addresses | `DeploymentBase` |
 | AAP-05 | MEDIUM | ✅ Rejecting a squatted organization does not free its name hash | `OrganizationRegistry` |
 | AAP-06 | MEDIUM | ✅ An installed component can be sold off its airframe | `ComponentRegistry` / `Marketplace` |
 | AAP-07 | MEDIUM | ✅ Document-hash uniqueness is global and permanent — cross-asset DoS | `DocumentRegistry` |
@@ -583,6 +605,165 @@ minute.
 
 The generalizable lesson: reviewing a deployment script as code and reviewing it as a
 procedure find different defects, and this codebase had only ever had the first.
+
+---
+
+## AAP-28 — `run()` seeded protocol admin from `msg.sender`, bricking the deployment
+
+- **Contract:** `script/DeployCore.s.sol`, `script/ConfigureProtocol.s.sol`, `script/DeploymentBase.s.sol`
+- **Function:** `DeployCore.run()`, `ConfigureProtocol.run()`, `_startBroadcast()`
+- **Status:** ✅ **Confirmed on Sepolia** — reproduced live, then covered by
+  `test/audit/Gate5Regression.t.sol`
+- **Raised:** by the first live deployment
+
+### Vulnerability
+
+```solidity
+function run() external {
+    address deployer = msg.sender;                       // <-- not the broadcaster
+    ...
+    _startBroadcast();
+    (...) = deploy(deployer, proposer, minDelay);         // RoleManager(initialAdmin = deployer)
+}
+```
+
+Inside a forge script's `run()`, `msg.sender` is the **script-frame sender** — Foundry's
+`DefaultSender` (`0x1804c8AB…`) unless `--sender` is passed. It is *not* the account
+that signs the broadcast transactions.
+
+`RoleManager`'s constructor takes `initialAdmin`, so the deployed protocol's sole
+`DEFAULT_ADMIN_ROLE` holder became an address for which **no private key exists**.
+
+`ConfigureProtocol.run()` carried the identical defect: it passed `msg.sender` as the
+account whose roles are granted and then renounced.
+
+### Impact
+
+**Total, unrecoverable loss of the deployment.** The protocol could never be configured:
+`ConfigureProtocol` requires `DEFAULT_ADMIN_ROLE` to write address-registry entries and
+grant machine roles, and that role was held by nobody. Nothing could be upgraded,
+unpaused, or repaired. The only remedy is to redeploy every contract.
+
+What makes it worse than a plain failure is how it presents. **Every transaction
+succeeded.** Every stage reported `ONCHAIN EXECUTION COMPLETE & SUCCESSFUL`. The artifact
+recorded 16 sensible-looking addresses. Nothing in the output suggested a problem; the
+protocol was simply dead, and would have stayed dead until the first attempt to
+administer it.
+
+On mainnet this is a six-figure loss of deployment gas plus whatever the redeployment
+window costs in reputation.
+
+### Attack scenario
+
+No attacker. An operator follows `docs/deploy.md` exactly, with a funded key and a
+correct `.env`, and deploys a protocol nobody owns.
+
+### Recommended remediation
+
+Make the broadcaster explicit, and refuse to proceed when it cannot be identified:
+
+```solidity
+function _startBroadcast() internal returns (address broadcaster) {
+    uint256 pk = vm.envOr("PRIVATE_KEY", uint256(0));
+    if (pk != 0) {
+        broadcaster = vm.addr(pk);
+        vm.startBroadcast(pk);
+    } else {
+        broadcaster = msg.sender;   // --account / --sender path
+        vm.startBroadcast();
+    }
+    if (broadcaster == address(0) || broadcaster == FOUNDRY_DEFAULT_SENDER) {
+        revert NoBroadcasterConfigured();
+    }
+}
+```
+
+Callers take the returned address rather than reading `msg.sender`. The guard is the part
+that matters: it converts a silent, unrecoverable misconfiguration into a revert before
+any gas is spent.
+
+**Coverage note.** `test_AAP28_AdminIsTheBroadcasterNotMsgSender` pins the defect itself.
+The `NoBroadcasterConfigured` branch is **not** automatically covered — reaching it needs
+`vm.prank`, which Foundry refuses to combine with broadcasting. It was verified by hand
+at the CLI and the gap is recorded in the test file rather than papered over with a test
+that passes without exercising the branch.
+
+---
+
+## AAP-29 — `fs_permissions` declared `./deployments` twice, blocking every deployment
+
+- **Contract:** `foundry.toml`
+- **Status:** ✅ **Confirmed on Sepolia**
+
+### Vulnerability
+
+```toml
+fs_permissions = [
+    { access = "read", path = "./out" },
+    { access = "read", path = "./deployments" },       # <-- wins
+    { access = "read-write", path = "./deployments" },
+]
+```
+
+The read-only entry took precedence, so `DeploymentBase._save` could never write the
+artifact. Every stage reverted in simulation with *"the path
+deployments/11155111.json is not allowed to be accessed for write operations."*
+
+### Impact
+
+The documented deployment path was **entirely non-functional** and had been since the
+scripts were written in Phase 9. It fails closed, so nothing unsafe could result — but
+the protocol could not be deployed by following its own runbook.
+
+Invisible for the same reason as AAP-28: no test calls `run()`, which is the only place
+file I/O happens.
+
+### Recommended remediation
+
+One entry per path. Applied.
+
+---
+
+## AAP-30 — A failed broadcast left an artifact full of simulation addresses
+
+- **Contract:** `script/DeploymentBase.s.sol`
+- **Function:** `_save()`, `_load()`
+- **Status:** ✅ **Confirmed on Sepolia**
+
+### Vulnerability
+
+Foundry executes a script twice: once to simulate, once to broadcast. `_save` runs in
+both. When the broadcast leg failed (AAP-28's sibling symptom — a rejected sender), the
+artifact retained the addresses from the **simulation**, which are deterministic,
+well-formed, and completely empty on-chain.
+
+### Impact
+
+The recorded file is indistinguishable from a successful deployment by inspection. The
+next stage would `_load` those addresses and wire the protocol to contracts that do not
+exist.
+
+`Verify` would not have caught it cleanly: `_verifyAddressBook` compares the on-chain
+address book against `_loadAll()` — the *same* artifact — so both sides agree with each
+other while disagreeing with the chain. The run would fail later, on an unrelated
+assertion, with a misleading message.
+
+Caught here only by checking `cast code` on the recorded addresses by hand before
+continuing.
+
+### Recommended remediation
+
+Reject a recorded address that holds no code, at load time:
+
+```solidity
+recorded = vm.parseJsonAddress(json, string.concat(".", key));
+if (recorded.code.length == 0) {
+    revert ArtifactAddressHasNoCode(key, recorded);
+}
+```
+
+This runs against forked chain state, so a stale artifact is rejected by the very next
+stage rather than propagating. Applied.
 
 ---
 

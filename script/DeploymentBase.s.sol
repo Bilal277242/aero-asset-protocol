@@ -63,6 +63,13 @@ abstract contract DeploymentBase is Script {
     /// @param key The missing key.
     error MissingArtifact(string key);
 
+    /// @notice Thrown when a recorded address holds no code on the target chain.
+    /// @dev Almost always a stale artifact from a run that simulated but never
+    ///      broadcast. Delete `deployments/<chainId>.json` and redeploy that stage.
+    /// @param key The artifact key.
+    /// @param recorded The address that was recorded but is not deployed.
+    error ArtifactAddressHasNoCode(string key, address recorded);
+
     /// @notice Returns the artifact path for the current chain.
     /// @return The relative file path.
     function _artifactPath() internal view returns (string memory) {
@@ -83,10 +90,20 @@ abstract contract DeploymentBase is Script {
         vm.writeJson(vm.toString(value), path, string.concat(".", key));
     }
 
-    /// @notice Reads a previously recorded address.
+    /// @notice Reads a previously recorded address, and proves it is really deployed.
+    /// @dev The code check is not paranoia. `_save` runs during simulation as well as
+    ///      during broadcast, so a stage that simulates cleanly and then fails to
+    ///      broadcast — a missing key, a rejected sender — leaves an artifact full of
+    ///      *simulation* addresses that look entirely plausible and contain nothing.
+    ///      Observed on the first Sepolia attempt.
+    ///
+    ///      Without this, the next stage wires the protocol to empty addresses and the
+    ///      failure surfaces much later as an unrelated revert. Worse, `Verify` compares
+    ///      the address book against this same file, so both sides would agree with each
+    ///      other while disagreeing with the chain.
     /// @param key The artifact key.
-    /// @return The recorded address.
-    function _load(string memory key) internal view returns (address) {
+    /// @return recorded The recorded address.
+    function _load(string memory key) internal view returns (address recorded) {
         string memory path = _artifactPath();
         if (!vm.exists(path)) {
             revert MissingArtifact(key);
@@ -97,7 +114,10 @@ abstract contract DeploymentBase is Script {
             revert MissingArtifact(key);
         }
 
-        return vm.parseJsonAddress(json, string.concat(".", key));
+        recorded = vm.parseJsonAddress(json, string.concat(".", key));
+        if (recorded.code.length == 0) {
+            revert ArtifactAddressHasNoCode(key, recorded);
+        }
     }
 
     /// @notice Deploys an ERC-1967 proxy over an implementation and initializes it.
@@ -129,15 +149,44 @@ abstract contract DeploymentBase is Script {
         a.escrowImplementation = _load("escrowImplementation");
     }
 
-    /// @notice Begins broadcasting from the configured deployer.
-    /// @dev Prefers `--account` (a keystore entry) when `PRIVATE_KEY` is unset, so a
-    ///      raw key never has to touch the environment on a real network.
-    function _startBroadcast() internal {
+    /// @notice Foundry's default script sender.
+    /// @dev A constant with no known private key. If a deployment ever names it as an
+    ///      owner or admin, that role is unrecoverable.
+    address internal constant FOUNDRY_DEFAULT_SENDER = 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38;
+
+    /// @notice Thrown when the broadcasting account cannot be identified.
+    /// @dev Set `PRIVATE_KEY`, or pass `--account`/`--sender`.
+    error NoBroadcasterConfigured();
+
+    /// @notice Begins broadcasting and returns the account that will send.
+    /// @dev **Returns the broadcaster rather than leaving callers to use `msg.sender`.**
+    ///      Inside a script's `run()`, `msg.sender` is the script-frame sender — which is
+    ///      `FOUNDRY_DEFAULT_SENDER` unless `--sender` is passed — and *not* the address
+    ///      that signs the broadcast transactions. `DeployCore` and `ConfigureProtocol`
+    ///      both used `msg.sender` as "the deployer", so a live run deployed a
+    ///      `RoleManager` whose sole admin was an address with no known key, bricking
+    ///      the protocol's entire authorization root while every transaction succeeded.
+    ///
+    ///      Prefers `--account` (a keystore entry) when `PRIVATE_KEY` is unset, so a raw
+    ///      key never has to touch the environment on a real network.
+    /// @return broadcaster The account transactions will be sent from.
+    function _startBroadcast() internal returns (address broadcaster) {
         uint256 pk = vm.envOr("PRIVATE_KEY", uint256(0));
+
         if (pk != 0) {
+            broadcaster = vm.addr(pk);
             vm.startBroadcast(pk);
         } else {
+            // `--account` / `--sender` path: forge sets `msg.sender` to that account.
+            broadcaster = msg.sender;
             vm.startBroadcast();
+        }
+
+        // The guard that would have caught the original defect. Reaching this means
+        // neither a key nor a sender was configured, so anything recorded as an owner
+        // would be permanently unusable.
+        if (broadcaster == address(0) || broadcaster == FOUNDRY_DEFAULT_SENDER) {
+            revert NoBroadcasterConfigured();
         }
     }
 }

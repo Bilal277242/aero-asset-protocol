@@ -35,9 +35,14 @@ ffi = false
 # Surface every solc warning; CI promotes them to errors (see profile.ci).
 ignored_warnings_from = ["lib"]
 
+# `./deployments` previously appeared twice, as `read` and again as `read-write`. The
+# read-only entry won, so `DeploymentBase._save` could never write the artifact and
+# every deployment stage reverted in simulation. It was invisible because
+# `FullLifecycle.t.sol` calls each stage's `deploy(...)` directly and never touches
+# `run()`, which is where the file I/O lives — so nothing exercised this until a real
+# deployment did. One entry per path.
 fs_permissions = [
     { access = "read", path = "./out" },
-    { access = "read", path = "./deployments" },
     { access = "read-write", path = "./deployments" },
 ]
 

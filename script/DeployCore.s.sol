@@ -54,7 +54,6 @@ contract DeployCore is DeploymentBase {
 
     /// @notice Deploys and records stage 1.
     function run() external {
-        address deployer = msg.sender;
         address proposer = vm.envAddress("PROTOCOL_ADMIN");
         uint256 minDelay = vm.envOr("TIMELOCK_MIN_DELAY", PRODUCTION_MIN_DELAY);
 
@@ -72,7 +71,10 @@ contract DeployCore is DeploymentBase {
             revert TimelockDelayTooShort(minDelay, PRODUCTION_MIN_DELAY);
         }
 
-        _startBroadcast();
+        // The broadcaster, never `msg.sender` — see `DeploymentBase._startBroadcast`.
+        // This address becomes `RoleManager`'s sole admin until the handover, so
+        // getting it wrong bricks the protocol with every transaction succeeding.
+        address deployer = _startBroadcast();
         (address timelock, address roleManager, address addressRegistry) = deploy(deployer, proposer, minDelay);
         vm.stopBroadcast();
 

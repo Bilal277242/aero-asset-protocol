@@ -151,8 +151,11 @@ contract ConfigureProtocol is DeploymentBase {
             marketplaceFeeBps: uint16(vm.envOr("MARKETPLACE_FEE_BPS", uint256(200)))
         });
 
-        _startBroadcast();
-        configure(a, c, msg.sender);
+        // The broadcaster, never `msg.sender`: this is the account whose roles are
+        // granted and then renounced, so naming the wrong one either reverts or leaves
+        // a live admin behind. See `DeploymentBase._startBroadcast`.
+        address deployer = _startBroadcast();
+        configure(a, c, deployer);
         vm.stopBroadcast();
     }
 }
