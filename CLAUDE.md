@@ -119,23 +119,23 @@ valuation, DeFi yield, decentralized arbitration, on-chain document storage.
 
 ### Web UI (`web/`)
 
-A separate track, planned independently of the contract phases. Nothing under `web/`
-may change anything in `src/`.
+**Status: removed. There is no `web/` directory.** A first attempt was built and then
+deleted at the user's request, to be redesigned from new requirements. Commit `7efbec3`
+holds it if any of it is ever wanted back.
 
-| Phase | Scope | Status |
-|---|---|---|
-| W0 | Scaffold, codegen, address book + drift banner, `/status` | ✅ complete |
-| W1 | `/assets/[assetId]` passport, bytes32 decoding, non-claims, local file verification | ✅ complete |
-| W2 | Domain layer for listings, chain clock, `/market` + listing detail | ⬜ |
-| W3 | Wallet, `useTxFlow`, `explainError`, `/portfolio`, first write (`makeOffer`) | ⬜ |
-| W4 | `acceptOfferFlow`, `/trades`, `deriveEscrowActions`, `buyFlow`, release | ⬜ |
-| W5 | Disputes, `claimTimeout` penalty breakdown, deferred payouts, `/arbitrate` | ⬜ |
-| W6 | `createListingFlow` precondition checklist, cancel, permissionless expiry | ⬜ |
-| W7 | Error copy, a11y, mobile, RPC-failure resilience, Playwright | ⬜ |
+Two things from that attempt are worth carrying into whatever replaces it, because both
+were learned the hard way rather than designed up front:
 
-The UI's central correctness rule: **listings, offers and credentials store a `status`
-that goes stale**, so nothing outside `web/src/lib/domain/` may read a raw status. The
-ESLint boundary enforces it and `web/test/lint/boundary.test.ts` asserts the rule fires.
+- **Listings, offers and credentials store a `status` that goes stale.** An expired
+  listing still reads `ACTIVE` on-chain until someone pays gas to record the expiry, so
+  a UI that renders the raw field shows expired listings as buyable. The contracts
+  provide `isListingActive` / `isOfferActive` / `isValid` for exactly this reason;
+  anything that reads `status` directly is a bug waiting to be found by a user.
+- **`getPassport`, `getListing`, `getAircraft` and friends revert on a miss**, so a
+  batched read needs `allowFailure: true` or one bad id takes the whole page down.
+
+A note on the `web` CI job in `.github/workflows/ci.yml`: it is retained deliberately
+and **will fail until a `web/` directory exists again**.
 
 ## Audit
 
