@@ -117,25 +117,100 @@ valuation, DeFi yield, decentralized arbitration, on-chain document storage.
 | 9b | Sepolia deploy + verify | ✅ complete — chain 11155111, all 25 contracts verified |
 | 10e | AAP-27 (runbook) and AAP-28/29/30 (live deploy) | ✅ complete — 29 findings stand, all closed |
 
-### Web UI (`web/`)
+## Web UI (`web/`)
 
-**Status: removed. There is no `web/` directory.** A first attempt was built and then
-deleted at the user's request, to be redesigned from new requirements. Commit `7efbec3`
-holds it if any of it is ever wanted back.
+The production frontend against the **existing deployed contracts**. It integrates with
+them; it does not drive their design. Do not change anything in `src/` to make a UI
+problem easier — if a contract genuinely cannot support a screen, say so and mark the
+capability **NOT AVAILABLE IN CURRENT CONTRACTS**.
 
-Two things from that attempt are worth carrying into whatever replaces it, because both
-were learned the hard way rather than designed up front:
+A first attempt was built and deleted (commit `7efbec3`); the current app is the
+redesign and shares no code with it.
 
-- **Listings, offers and credentials store a `status` that goes stale.** An expired
-  listing still reads `ACTIVE` on-chain until someone pays gas to record the expiry, so
-  a UI that renders the raw field shows expired listings as buyable. The contracts
-  provide `isListingActive` / `isOfferActive` / `isValid` for exactly this reason;
-  anything that reads `status` directly is a bug waiting to be found by a user.
-- **`getPassport`, `getListing`, `getAircraft` and friends revert on a miss**, so a
-  batched read needs `allowFailure: true` or one bad id takes the whole page down.
+### Read before implementing
 
-A note on the `web` CI job in `.github/workflows/ci.yml`: it is retained deliberately
-and **will fail until a `web/` directory exists again**.
+- `docs/frontend-contract-map.md` — the ABI surface, per contract, and what is genuinely
+  absent. Documentation is not evidence a function exists; this file was written against
+  compiled ABIs and found two defects in `/docs` doing exactly that.
+- `docs/frontend-architecture.md` — decisions A1–A14, the same standing as D1–D8.
+- `docs/design-system.md` — tokens, components, and the aesthetic the product is held to:
+  enterprise aviation software, never generic crypto/NFT.
+- `docs/marketplace-indexing.md` — staged plan and the thresholds that trigger each stage.
+
+### Stack
+
+Next.js 15 App Router · React 19 · TypeScript strict + `noUncheckedIndexedAccess` ·
+Tailwind · Radix primitives · wagmi **3** · viem 2 · TanStack Query 5. No RainbowKit, no
+additional frameworks — introducing one needs a reason and approval.
+
+Note wagmi is v3, not v2: `useAccount` is a deprecated alias for `useConnection`, and
+`injected` is exported from the `wagmi` root.
+
+### Hard rules
+
+- **Never read a stored `status` to decide what a user can do.** Listings, offers and
+  credentials all go stale — an expired listing still reads `ACTIVE` until someone pays
+  gas. Use `isListingActive` / `isOfferActive` / `isValid`. A UI that renders the raw
+  field shows expired listings as buyable.
+- **`getPassport`, `getListing`, `getAircraft`, `getCredential` and friends revert on a
+  miss**, so every batched read needs `allowFailure: true` or one bad id takes the page
+  down.
+- **Components must not construct a contract call.** ESLint blocks ABIs and
+  `viem/actions` / `wagmi/actions` from `src/components/**` and `src/app/**`. Reads go in
+  `lib/api` behind a Reader function; writes go in `lib/api/*writes.ts` as typed
+  descriptors. Enums and error tables are allowed through — display constants with no
+  capability attached.
+- **Frontend checks are never the security boundary.** `RoleManager` and the contracts
+  decide. Role gating exists to avoid offering buttons that revert; say so where it
+  could be mistaken for enforcement.
+- **Copy every deadline comparison from the contract, and do not assume the protocol is
+  uniform.** Escrow deadlines use strict `>`; `expireCredential` uses `<=`. Four
+  off-by-one errors shipped past typecheck here once.
+- Distinguish **protocol verification** from **legal or regulatory certification**
+  wherever a verified state is shown. No fake statistics, no claimed partnerships,
+  certifications or customers.
+- Never expose private keys, request unnecessary wallet permissions, or sign arbitrary
+  messages. There is deliberately no unlimited-approval helper.
+- Contract addresses come from `ProtocolAddressRegistry` at runtime; exactly one address
+  is configured. Never hardcode the others.
+- `src/lib/contracts/generated/` is codegen from Foundry artifacts (`npm run codegen`),
+  and is committed. Do not hand-edit it. It parses ASTs for enum member names, so
+  `ENUM_SOURCES` must list the **interface** that declares each enum.
+
+### Before claiming a web phase complete
+
+Run from **Windows PowerShell**, in `web/`:
+
+```bash
+npx tsc --noEmit && npm run lint && npm test && npm run build
+```
+
+Then verify against live Sepolia with the preview server — a clean build proves nothing
+about whether the page reads the chain. A CSP that blocked every RPC call once shipped
+with all four gates green and every panel rendering a plausible error state.
+
+Tests live in `web/test/`: `unit/` for domain logic, `lint/` for the containment
+boundary. When a test guards a contract rule, **prove it is load-bearing** by
+reintroducing the bug and watching exactly that test fail.
+
+### Web phase status
+
+| Phase | Scope | Status |
+|---|---|---|
+| W0 | Repository inspection, contract map, architecture | ✅ complete |
+| W1 | Design system + foundational components | ✅ complete |
+| W2 | Public site — `/`, `/platform`, `/verification`, `/about`, `/documentation`, `/contact` | ✅ complete |
+| W3 | Web3 infrastructure — wallet, chain, tx lifecycle, error decoding | ✅ complete |
+| W4 | `/dashboard` | ✅ complete |
+| W5 | Asset passport — `/assets`, `/assets/[id]` | ✅ complete |
+| W6 | Marketplace — `/marketplace`, `/marketplace/[listingId]` | ✅ complete |
+| W7 | Escrow and purchase — `/trades`, `/trades/[escrowId]` | ✅ complete — 28 lifecycle tests |
+| W8 | Organizations and credentials — `/organizations`, `/credentials` | ✅ complete — 29 authorization tests |
+
+**Blocked:** funding the live escrow. Buyer `0xabb020a5A0C5f325CB068E90C915de2E46628145`
+holds 0 USDC and the Circle faucet requires a CAPTCHA, which an agent must not complete.
+
+The `web` CI job in `.github/workflows/ci.yml` is active and enforces the same gate.
 
 ## Audit
 

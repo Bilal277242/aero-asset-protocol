@@ -154,7 +154,10 @@ jobs:
       - name: Bindings match the contracts
         run: |
           npm run codegen
-          git diff --exit-code -- src/generated/abis src/generated/enums.ts src/generated/errors.ts
+          git diff --exit-code -- \
+            src/lib/contracts/generated/abis \
+            src/lib/contracts/generated/enums.ts \
+            src/lib/contracts/generated/errors.ts
 
       - name: Production build
         run: npm run build

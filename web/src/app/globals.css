@@ -1,0 +1,176 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AeroAsset design tokens.
+
+   Light is the primary palette. Enterprise aviation software is used in daylight
+   offices and gets printed; dark is a genuine second mode, not the identity. That
+   choice alone does most of the work of not looking like a crypto app.
+
+   Neutrals carry a deliberate blue-green bias toward the accent — a pure grey reads
+   as unconsidered. Semantic colours are named for meaning, never hue.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Surfaces ───────────────────────────────────────────────────────── */
+  --ground: #eef1f4;   /* page                                              */
+  --panel: #ffffff;    /* cards, tables, the reading surface                */
+  --raised: #ffffff;   /* modals, popovers — separated by shadow, not tint  */
+  --sunken: #f6f8fa;   /* table headers, inset wells, code                  */
+
+  /* ── Ink ────────────────────────────────────────────────────────────── */
+  --ink: #0e151b;      /* primary text                                      */
+  --ink-2: #52606c;    /* secondary — labels, descriptions                  */
+  --ink-3: #7a8792;    /* tertiary — captions, placeholders, units          */
+  --ink-inv: #ffffff;  /* on accent                                         */
+
+  /* ── Rules. Hairlines do the work shadows would do elsewhere. ───────── */
+  --rule: #d1d8de;
+  --rule-2: #e5eaee;   /* internal dividers, lighter                        */
+  --rule-strong: #0e151b;
+
+  /* ── Accent: petrol. CAA document ink, instrument bezels. ───────────── */
+  --accent: #0b5d6b;
+  --accent-hover: #084853;
+  --accent-subtle: #e6f2f4;
+  --accent-ink: #ffffff;
+
+  /* ── Semantic state. Four values, not three. ────────────────────────── */
+  --confirmed: #1d6b47;      /* the chain asserts it, now                   */
+  --confirmed-bg: #e3f0e9;
+  --blocked: #8a5804;        /* an action would revert                      */
+  --blocked-bg: #f7edd9;
+  --adverse: #9c2a2a;        /* terminal or hostile                         */
+  --adverse-bg: #f7e5e5;
+  --unrecorded: #5b4a93;     /* true by time, not yet written to the chain  */
+  --unrecorded-bg: #ece8f6;
+
+  --focus: #0e7787;
+
+  /* ── Elevation. Restrained on purpose: technical documents use rules. ─ */
+  --shadow-hairline: 0 1px 0 rgba(14, 21, 27, 0.04);
+  --shadow-raised: 0 1px 2px rgba(14, 21, 27, 0.07), 0 1px 1px rgba(14, 21, 27, 0.04);
+  --shadow-overlay: 0 4px 12px rgba(14, 21, 27, 0.1), 0 1px 3px rgba(14, 21, 27, 0.06);
+  --shadow-modal: 0 16px 48px rgba(14, 21, 27, 0.18), 0 2px 8px rgba(14, 21, 27, 0.08);
+
+  /* ── Type ───────────────────────────────────────────────────────────── */
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont,
+    "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", "JetBrains Mono", Menlo,
+    Consolas, "DejaVu Sans Mono", monospace;
+}
+
+.dark {
+  --ground: #090e13;
+  --panel: #101820;
+  --raised: #16202a;
+  --sunken: #0d141b;
+
+  --ink: #e2e9ef;
+  --ink-2: #8c9aa7;
+  --ink-3: #6a7783;
+  --ink-inv: #061014;
+
+  --rule: #233038;
+  --rule-2: #1a242e;
+  --rule-strong: #e2e9ef;
+
+  --accent: #55c2d2;
+  --accent-hover: #7bd5e2;
+  --accent-subtle: #10262c;
+  --accent-ink: #061014;
+
+  --confirmed: #57c08a;
+  --confirmed-bg: #0f2419;
+  --blocked: #d9a23b;
+  --blocked-bg: #292012;
+  --adverse: #e2776f;
+  --adverse-bg: #2a1716;
+  --unrecorded: #a99ad8;
+  --unrecorded-bg: #1d1830;
+
+  --focus: #55c2d2;
+
+  --shadow-hairline: 0 1px 0 rgba(0, 0, 0, 0.3);
+  --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-overlay: 0 4px 12px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-modal: 0 16px 48px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+@layer base {
+  * {
+    @apply border-rule;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+
+    /* Must sit on the root as well as on body. The off-canvas drawer is
+       `position: fixed`, so its containing block is the viewport and no ancestor short of
+       the root can clip it — with only `body { overflow-x: clip }` the document still
+       reports the inflated scroll width and the page slides sideways on a phone. */
+    overflow-x: clip;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+
+    /* The off-canvas navigation drawer sits at translateX(-100%) while closed, which
+       inflates the document's scroll width and lets the whole page slide sideways on a
+       phone. `clip` rather than `hidden` on purpose: `hidden` would make the body a
+       scroll container and break `position: sticky` on the desktop sidebar. Genuine
+       wide content is unaffected — tables scroll inside their own container. */
+    overflow-x: clip;
+  }
+
+  /* Digits that sit in columns must not dance as they change. */
+  .font-mono,
+  table,
+  input[type="number"] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* One focus treatment everywhere. Visible, never removed. */
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background: var(--accent-subtle);
+    color: var(--ink);
+  }
+
+  ::placeholder {
+    color: var(--ink-3);
+    opacity: 1;
+  }
+}
+
+@layer components {
+  /* An uppercase monospace micro-label. Used for every field key, table header and
+     eyebrow in the system, so it is defined once. */
+  .label-key {
+    @apply font-mono text-3xs uppercase text-ink-3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
