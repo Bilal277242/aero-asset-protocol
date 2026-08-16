@@ -37,6 +37,7 @@ import type { ProtocolRole } from "@/lib/api/role-catalog";
 import type { WriteRequest } from "@/lib/api/writes";
 import type { AddressBook } from "@/lib/contracts/addressBook";
 import { explorerAddress } from "@/config/env";
+import { cn } from "@/lib/utils/cn";
 
 type AdminStateData = Awaited<ReturnType<typeof readAdminState>>;
 
@@ -107,18 +108,31 @@ export default function AdminPage() {
         <>
           <Overview state={state.data} blockNumber={state.blockNumber} />
 
-          <nav className="mb-4 mt-6 flex flex-wrap gap-1.5" aria-label="Administration sections">
+          {/*
+            A horizontally scrollable strip rather than a wrapping block: nine sections
+            wrap to three ragged rows on a phone and the page header ends up below the
+            fold. `-mx-4 px-4` lets it bleed to the screen edge so the last tab is not
+            visually trapped against the padding.
+          */}
+          <nav
+            className="mb-4 mt-6 -mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 tablet:mx-0 tablet:flex-wrap tablet:px-0"
+            aria-label="Administration sections"
+          >
             {SECTIONS.map((s) => (
               <button
                 key={s}
                 type="button"
                 onClick={() => setSection(s)}
                 aria-current={section === s ? "page" : undefined}
-                className={
+                className={cn(
+                  "shrink-0 whitespace-nowrap rounded border px-2.5 text-xs",
+                  "min-h-10 tablet:min-h-0 tablet:py-1",
+                  "transition-colors duration-150",
+                  "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent",
                   section === s
-                    ? "rounded border border-accent bg-accent-subtle px-2.5 py-1 text-xs font-medium text-accent"
-                    : "rounded border border-rule px-2.5 py-1 text-xs text-ink-2 hover:bg-sunken hover:text-ink"
-                }
+                    ? "border-accent bg-accent-subtle font-medium text-accent"
+                    : "border-rule text-ink-2 hover:bg-sunken hover:text-ink",
+                )}
               >
                 {SECTION_LABEL[s]}
               </button>

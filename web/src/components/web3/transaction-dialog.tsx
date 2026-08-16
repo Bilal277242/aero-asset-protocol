@@ -231,6 +231,17 @@ function StageTrack({ tx }: { tx: TxState }) {
         })}
       </ol>
 
+      {/*
+        The per-step labels are hidden below tablet to keep the track from wrapping, which
+        leaves a phone showing five unlabelled circles mid-transaction. Naming the current
+        step here restores what the track is actually communicating.
+      */}
+      {activeIndex >= 0 && STAGES[activeIndex] && (
+        <p className="text-2xs font-medium text-ink tablet:hidden">
+          Step {activeIndex + 1} of {STAGES.length} · {STAGES[activeIndex].label}
+        </p>
+      )}
+
       {tx.phase === "blocked" && (
         <p className="flex items-start gap-1.5 text-xs text-blocked">
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />

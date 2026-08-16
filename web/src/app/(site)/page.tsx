@@ -303,7 +303,14 @@ export default function HomePage() {
 
       {/* ── 5 · Maintenance and provenance ────────────────────────── */}
       <Section>
-        <div className="grid gap-8 laptop:grid-cols-[1fr_1.1fr]">
+        {/*
+          `[&>*]:min-w-0` is load-bearing. A grid item defaults to `min-width: auto`, so it
+          refuses to shrink below its content's intrinsic width — and the table below has a
+          wide one. Without this the column computes to 423px inside a 343px grid on a
+          phone, and `overflow-x: clip` on the body then hides the overflow instead of
+          scrolling it, silently cutting the right-hand side off every paragraph here.
+        */}
+        <div className="grid gap-8 laptop:grid-cols-[1fr_1.1fr] [&>*]:min-w-0">
           <SectionHead
             eyebrow="Maintenance &amp; provenance"
             title="Two dates, and only one of them is witnessed"

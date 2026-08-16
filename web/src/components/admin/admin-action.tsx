@@ -127,7 +127,12 @@ export function AdminAction({
         action.irreversible ? "border-adverse/40" : action.danger ? "border-blocked/40" : "border-rule",
       )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      {/*
+        Stacked below tablet. Side by side, `flex-1 min-w-0` let the description column
+        collapse to ~142px on a phone while the role badges inside it are 166–188px wide
+        and cannot wrap mid-token, so they overflowed their own container.
+      */}
+      <div className="flex flex-col gap-3 tablet:flex-row tablet:items-start tablet:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-sm font-medium text-ink">{action.label}</span>
@@ -175,13 +180,13 @@ export function AdminAction({
         </div>
 
         {!build ? (
-          <p className="max-w-[26ch] shrink-0 text-right text-2xs leading-relaxed text-ink-3">
+          <p className="shrink-0 text-2xs leading-relaxed text-ink-3 tablet:max-w-[26ch] tablet:text-right">
             {action.contractOnly ? "Held by a contract" : "Listed only — not offered here"}
           </p>
         ) : (
           <div className="shrink-0">
             {blocked ? (
-              <p className="max-w-[24ch] text-right text-2xs leading-relaxed text-ink-3">
+              <p className="text-2xs leading-relaxed text-ink-3 tablet:max-w-[24ch] tablet:text-right">
                 {blocked.reason}
               </p>
             ) : (

@@ -200,6 +200,31 @@ Note wagmi is v3, not v2: `useAccount` is a deprecated alias for `useConnection`
   and is committed. Do not hand-edit it. It parses ASTs for enum member names, so
   `ENUM_SOURCES` must list the **interface** that declares each enum.
 
+### Layout and responsive rules
+
+- **The Tailwind theme replaces Tailwind's defaults; it does not extend them.** `colors`,
+  `spacing` and `boxShadow` are restricted on purpose. A class outside the scale compiles
+  to **nothing** — silently. `min-h-11` produced no CSS and left a nav link at its 19px
+  line box while looking correct in the source. If a spacing value matters, check it is
+  in the scale (`tailwind.config.ts`) and then measure the rendered element.
+- **A grid or flex child containing wide content needs `min-w-0`.** Items default to
+  `min-width: auto` and refuse to shrink below their content's intrinsic width, so one
+  table forces its whole column wider than the grid. Because `html`/`body` carry
+  `overflow-x: clip`, the result is not a scrollbar — it is text silently cut off past
+  the right edge. The signature is `grid-template-columns` computing wider than the grid.
+- **Wide content scrolls inside its own container**, never the page body. Tables get the
+  scroll affordance in `TableWrap`; the fade and the pinned-column shadow are driven by
+  measured scroll state, so content that fits gets no decoration.
+- **Touch targets are 48px in the drawer and on mobile controls**, dense on the permanent
+  sidebar where a pointer is aiming (`min-h-12 … laptop:min-h-0`). Icon buttons keep the
+  icon small and pad the *target* with negative margin so nothing shifts.
+- **Only the dialog body scrolls.** `DialogContent` is a three-row grid so the confirm
+  button cannot leave the screen mid-transaction, and heights use `dvh` — mobile browsers
+  measure `vh` against the viewport with the address bar hidden.
+- **Anything that navigates must be keyboard-reachable.** A click handler on a `<tr>` is
+  invisible without a pointer; interactive rows take focus and handle Enter and Space.
+- Animations stay functional: 120–200ms, state feedback only. No decorative motion.
+
 ### Before claiming a web phase complete
 
 Run from **Windows PowerShell**, in `web/`:
@@ -217,6 +242,18 @@ underneath a running dev server leaves it serving production chunks: every route
 with `__webpack_modules__[moduleId] is not a function` until it is restarted. Console
 errors from that window are corruption artifacts, not defects — re-read them in a fresh
 tab before chasing one.
+
+**Measure responsive work; do not eyeball it.** Walk the DOM for children wider than
+their parent, elements past the viewport edge, and undersized targets, at 375 / 768 /
+1024 / 1440. Three traps in this harness have each produced a confident, worthless pass:
+
+- `history.pushState` does **not** trigger App Router navigation, so a sweep over routes
+  measures the first page eighteen times and reports it clean. Use `location.assign`.
+- The preview pane silently reverts a resize. Assert `innerWidth` is what you asked for
+  before trusting a measurement.
+- A hidden pane does not composite, so CSS transitions stall and `getComputedStyle`
+  returns the pre-transition value. Read it again with `style.transition = "none"` before
+  concluding a class did not apply.
 
 Tests live in `web/test/`: `unit/` for domain logic, `lint/` for the containment
 boundary. When a test guards a contract rule, **prove it is load-bearing** by
@@ -237,6 +274,7 @@ reintroducing the bug and watching exactly that test fail.
 | W8 | Organizations and credentials — `/organizations`, `/credentials` | ✅ complete — 29 authorization tests |
 | W9 | Documents and maintenance — `/documents`, `/maintenance`, hash verification | ✅ complete — 21 tests |
 | W10 | Admin console — `/admin`, all 26 privileged functions | ✅ complete — 15 tests |
+| W11 | UI/UX polish — responsive audit at 4 widths, tables, dialogs, touch targets | ✅ complete |
 
 **Blocked:** funding the live escrow. Buyer `0xabb020a5A0C5f325CB068E90C915de2E46628145`
 holds 0 USDC and the Circle faucet requires a CAPTCHA, which an agent must not complete.

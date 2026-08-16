@@ -137,7 +137,14 @@ export function CopyButton({ value, what = "Value" }: { value: string; what?: st
       onClick={() => {
         void navigator.clipboard.writeText(value).then(() => setCopied(true));
       }}
-      className="text-ink-3 transition-colors hover:text-accent"
+      className={cn(
+        // The icon stays 12px so it does not shout next to a hash, but the *target* is
+        // padded out to something a thumb can hit. A 12px tap target beside a 12px
+        // neighbour is a coin toss on a phone.
+        "relative -m-2 inline-flex items-center justify-center p-2",
+        "text-ink-3 transition-colors duration-150 hover:text-accent",
+        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent focus-visible:rounded-xs",
+      )}
       aria-label={copied ? `${what} copied` : `Copy ${what.toLowerCase()}`}
     >
       {copied ? (

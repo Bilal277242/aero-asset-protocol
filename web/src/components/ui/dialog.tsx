@@ -21,11 +21,17 @@ export const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-1/2 top-1/2 z-50 grid w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2",
+        "fixed left-1/2 top-1/2 z-50 w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2",
         "animate-scale-in rounded-lg border border-rule bg-raised shadow-modal",
-        // Full height on phones minus a margin, so a long modal is scrollable rather
-        // than clipped off the bottom of the viewport.
-        "max-h-[calc(100vh-32px)] overflow-y-auto",
+        // A three-row grid — header, body, footer — so only the body scrolls. When the
+        // whole dialog scrolled, a long transaction summary pushed the confirm button
+        // off the bottom on a phone, which is precisely the control you must not lose
+        // sight of mid-transaction.
+        //
+        // `dvh` rather than `vh`: mobile browsers count `vh` against the viewport with
+        // the address bar hidden, so a `100vh`-tall modal is taller than what the user
+        // can actually see until they scroll.
+        "grid max-h-[calc(100dvh-32px)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden",
         size === "sm" && "tablet:max-w-[380px]",
         size === "md" && "tablet:max-w-[520px]",
         size === "lg" && "tablet:max-w-[760px]",
@@ -73,8 +79,9 @@ export const DialogDescription = React.forwardRef<
 ));
 DialogDescription.displayName = "DialogDescription";
 
+/** The only scrolling region. `min-h-0` is what lets it actually shrink inside the grid. */
 export function DialogBody({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("px-4 py-4", className)} {...props} />;
+  return <div className={cn("min-h-0 overflow-y-auto px-4 py-4", className)} {...props} />;
 }
 
 export function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
