@@ -49,6 +49,7 @@ export function TransactionDialog({
   tx,
   onConfirm,
   confirmLabel = "Confirm",
+  confirmDisabled = false,
   children,
 }: {
   open: boolean;
@@ -60,6 +61,12 @@ export function TransactionDialog({
   tx: TxState;
   onConfirm: () => void;
   confirmLabel?: string;
+  /**
+   * Holds the confirm button closed while the caller's own gate is unmet — a typed
+   * confirmation phrase, an incomplete form. Distinct from `inFlight`, which disables it
+   * because a transaction is already running.
+   */
+  confirmDisabled?: boolean;
   /** Form inputs, shown only before submission. */
   children?: React.ReactNode;
 }) {
@@ -147,7 +154,12 @@ export function TransactionDialog({
               <Button variant="secondary" disabled={inFlight} onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" loading={inFlight} onClick={onConfirm}>
+              <Button
+                variant="primary"
+                loading={inFlight}
+                disabled={confirmDisabled}
+                onClick={onConfirm}
+              >
                 {confirmLabel}
               </Button>
             </>

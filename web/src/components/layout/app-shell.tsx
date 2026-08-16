@@ -14,6 +14,7 @@ import {
   BadgeCheck,
   FileText,
   Wrench,
+  SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/button";
@@ -32,8 +33,13 @@ import { ThemeToggle } from "./theme-toggle";
  * ASSET_VERIFIER — that person should see two work queues on one screen, not navigate
  * between two places that look the same. So privileged work lives *inside* the subject
  * pages: an ORG_VERIFIER sees verify and suspend on the organization itself, where the
- * record they are judging is in front of them. The ops tier is consequently empty, and
- * `hasOperations` currently only reserves the shape for a console that earns its own page.
+ * record they are judging is in front of them.
+ *
+ * `/admin` is the one ops surface that earns its own page, because it answers a question
+ * no subject page can: what is the protocol's privileged surface, and which parts of it
+ * can *this* account reach. It is nav-gated on holding any role — but the page itself is
+ * readable by anyone and offers nothing without an on-chain role, because hiding a nav
+ * link is not access control and must never be mistaken for it.
  *
  * Standing is passed in rather than resolved here, so this component stays presentational
  * and testable without a chain.
@@ -69,6 +75,7 @@ const NAV: NavItem[] = [
   { href: "/documents", label: "Documents", icon: FileText, tier: "public" },
   { href: "/maintenance", label: "Maintenance", icon: Wrench, tier: "public" },
   { href: "/trades", label: "My trades", icon: Handshake, tier: "account" },
+  { href: "/admin", label: "Administration", icon: SlidersHorizontal, tier: "ops" },
 ];
 
 export function AppShell({

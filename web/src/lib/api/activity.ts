@@ -76,7 +76,7 @@ const SOURCES: Source[] = [
     describe: (a) => ({
       title: `${assetKindLabel[Number(a.kind)] ?? "Asset"} registered`,
       detail: `Asset #${n(a.assetId)} by organization #${n(a.registrarOrgId)}, owned by ${shortAddr(a.owner)}`,
-      href: `/fleet/${n(a.assetId)}`,
+      href: `/assets/${n(a.assetId)}`,
     }),
   },
   {
@@ -87,7 +87,7 @@ const SOURCES: Source[] = [
     describe: (a) => ({
       title: a.verified ? "Asset verified" : "Asset verification withdrawn",
       detail: `Asset #${n(a.assetId)}${a.verified ? ` credited to organization #${n(a.verifierOrgId)}` : ""}`,
-      href: `/fleet/${n(a.assetId)}`,
+      href: `/assets/${n(a.assetId)}`,
     }),
   },
   {
@@ -98,7 +98,7 @@ const SOURCES: Source[] = [
     describe: (a) => ({
       title: "Asset status changed",
       detail: `Asset #${n(a.assetId)} moved to status ${n(a.newStatus)}`,
-      href: `/fleet/${n(a.assetId)}`,
+      href: `/assets/${n(a.assetId)}`,
     }),
   },
   {
@@ -139,7 +139,7 @@ const SOURCES: Source[] = [
     describe: (a) => ({
       title: "Document registered",
       detail: `Document #${n(a.documentId)} against asset #${n(a.assetId)}`,
-      href: `/fleet/${n(a.assetId)}`,
+      href: `/assets/${n(a.assetId)}`,
     }),
   },
   {
@@ -150,7 +150,7 @@ const SOURCES: Source[] = [
     describe: (a) => ({
       title: `${maintenanceTypeLabel[Number(a.mType)] ?? "Maintenance"} recorded`,
       detail: `Asset #${n(a.assetId)} by organization #${n(a.performedByOrgId)}`,
-      href: `/fleet/${n(a.assetId)}`,
+      href: `/assets/${n(a.assetId)}`,
     }),
   },
   {

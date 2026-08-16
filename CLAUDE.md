@@ -168,7 +168,16 @@ Note wagmi is v3, not v2: `useAccount` is a deprecated alias for `useConnection`
   find it. Re-export from the reader module so callers still need one import.
 - **Frontend checks are never the security boundary.** `RoleManager` and the contracts
   decide. Role gating exists to avoid offering buttons that revert; say so where it
-  could be mistaken for enforcement.
+  could be mistaken for enforcement. A connected wallet is never an administrator until
+  `hasRole` says so, and hiding a nav link is not access control.
+- **Derive whether an action is reachable; never hardcode it.** On this deployment
+  `PROTOCOL_ADMIN` *and* `FEE_MANAGER` are held solely by `ProtocolTimelock`, so no
+  wallet can execute their actions directly — read the holders and say so. A hardcoded
+  "timelocked" flag keeps claiming it after a role moves. Roles held only by contracts
+  (`ASSET_MINTER`, `ESCROW_FACTORY`, `SETTLEMENT`, and on Sepolia `ARBITRATOR`) are
+  detected by bytecode, not by a name list.
+- **Irreversible and dangerous are different.** Only irreversible actions get the
+  type-to-confirm gate. Marking everything dangerous trains people to click through.
 - **Copy every deadline comparison from the contract, and do not assume the protocol is
   uniform.** Escrow deadlines use strict `>`; `expireCredential` uses `<=`. Four
   off-by-one errors shipped past typecheck here once.
@@ -203,6 +212,12 @@ Then verify against live Sepolia with the preview server — a clean build prove
 about whether the page reads the chain. A CSP that blocked every RPC call once shipped
 with all four gates green and every panel rendering a plausible error state.
 
+**Stop the dev server before running `npm run build`.** They share `.next`, and building
+underneath a running dev server leaves it serving production chunks: every route 500s
+with `__webpack_modules__[moduleId] is not a function` until it is restarted. Console
+errors from that window are corruption artifacts, not defects — re-read them in a fresh
+tab before chasing one.
+
 Tests live in `web/test/`: `unit/` for domain logic, `lint/` for the containment
 boundary. When a test guards a contract rule, **prove it is load-bearing** by
 reintroducing the bug and watching exactly that test fail.
@@ -221,6 +236,7 @@ reintroducing the bug and watching exactly that test fail.
 | W7 | Escrow and purchase — `/trades`, `/trades/[escrowId]` | ✅ complete — 28 lifecycle tests |
 | W8 | Organizations and credentials — `/organizations`, `/credentials` | ✅ complete — 29 authorization tests |
 | W9 | Documents and maintenance — `/documents`, `/maintenance`, hash verification | ✅ complete — 21 tests |
+| W10 | Admin console — `/admin`, all 26 privileged functions | ✅ complete — 15 tests |
 
 **Blocked:** funding the live escrow. Buyer `0xabb020a5A0C5f325CB068E90C915de2E46628145`
 holds 0 USDC and the Circle faucet requires a CAPTCHA, which an agent must not complete.
