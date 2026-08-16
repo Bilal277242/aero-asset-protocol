@@ -160,6 +160,12 @@ Note wagmi is v3, not v2: `useAccount` is a deprecated alias for `useConnection`
   `lib/api` behind a Reader function; writes go in `lib/api/*writes.ts` as typed
   descriptors. Enums and error tables are allowed through — display constants with no
   capability attached.
+- **Keep pure decision logic in its own module, away from the readers.** Anything under
+  `lib/api` that touches `addressBook` pulls in `config/env`, which throws at import
+  without a configured RPC — so a pure function living beside a reader cannot be tested
+  without one. This has bitten twice: `roles.ts` → `role-catalog.ts`, and `records.ts` →
+  `hash-check.ts`. Both were found by a test refusing to load, which is the cheap way to
+  find it. Re-export from the reader module so callers still need one import.
 - **Frontend checks are never the security boundary.** `RoleManager` and the contracts
   decide. Role gating exists to avoid offering buttons that revert; say so where it
   could be mistaken for enforcement.
@@ -169,6 +175,14 @@ Note wagmi is v3, not v2: `useAccount` is a deprecated alias for `useConnection`
 - Distinguish **protocol verification** from **legal or regulatory certification**
   wherever a verified state is shown. No fake statistics, no claimed partnerships,
   certifications or customers.
+- **A matching document hash proves integrity, never authenticity.** It shows the bytes
+  are unchanged since registration and that the record refers to them. It says nothing
+  about whether the document is genuine, whether its contents are true, or whether any
+  authority accepted it — a forged certificate hashes exactly as well as a real one. Say
+  both halves wherever a hash check reports success.
+- **Do not render a field the contract does not have.** A maintenance record has no
+  status; a document has no verification flag. Where a screen seems to need one, say what
+  is actually stored and why the absence is deliberate.
 - Never expose private keys, request unnecessary wallet permissions, or sign arbitrary
   messages. There is deliberately no unlimited-approval helper.
 - Contract addresses come from `ProtocolAddressRegistry` at runtime; exactly one address
@@ -206,6 +220,7 @@ reintroducing the bug and watching exactly that test fail.
 | W6 | Marketplace — `/marketplace`, `/marketplace/[listingId]` | ✅ complete |
 | W7 | Escrow and purchase — `/trades`, `/trades/[escrowId]` | ✅ complete — 28 lifecycle tests |
 | W8 | Organizations and credentials — `/organizations`, `/credentials` | ✅ complete — 29 authorization tests |
+| W9 | Documents and maintenance — `/documents`, `/maintenance`, hash verification | ✅ complete — 21 tests |
 
 **Blocked:** funding the live escrow. Buyer `0xabb020a5A0C5f325CB068E90C915de2E46628145`
 holds 0 USDC and the Circle faucet requires a CAPTCHA, which an agent must not complete.

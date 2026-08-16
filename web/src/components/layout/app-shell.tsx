@@ -12,6 +12,8 @@ import {
   Handshake,
   Building2,
   BadgeCheck,
+  FileText,
+  Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/button";
@@ -64,6 +66,8 @@ const NAV: NavItem[] = [
   { href: "/marketplace", label: "Market", icon: Store, tier: "public" },
   { href: "/organizations", label: "Organizations", icon: Building2, tier: "public" },
   { href: "/credentials", label: "Credentials", icon: BadgeCheck, tier: "public" },
+  { href: "/documents", label: "Documents", icon: FileText, tier: "public" },
+  { href: "/maintenance", label: "Maintenance", icon: Wrench, tier: "public" },
   { href: "/trades", label: "My trades", icon: Handshake, tier: "account" },
 ];
 

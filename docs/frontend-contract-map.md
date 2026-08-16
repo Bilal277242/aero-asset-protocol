@@ -453,7 +453,21 @@ local file-verification tool compares against.
 
 A caller can **never** attribute a document to an organization it does not act for.
 
-**Frontend:** → `/fleet/[assetId]` documents tab + local hash verification
+> **A document has no verification flag.** What exists is `status`
+> (`ACTIVE`/`SUPERSEDED`/`REVOKED`) and the hash. There is no `verified` boolean, no
+> verifier org, and no equivalent of `AssetRegistry.isVerified`. A "verification status"
+> for a document can only mean its lifecycle status, or the result of comparing a file
+> against `documentHash` — and the second is a check the *reader* performs, not a claim
+> the protocol stores.
+
+> **`issuedAt` is claimed; the witnessed time is the registration block.** Unlike
+> `MaintenanceRecord`, `Document` has no `recordedAt` — the interface says outright that
+> the block timestamp is already in the event and storing it would cost a field for
+> nothing. So the only date in storage is the unverifiable one, and showing when the
+> chain actually saw the document requires reading `DocumentRegistered`.
+
+**Frontend:** → `/documents`, `/documents/[id]` (hash verification), and the
+`/assets/[id]` documents tab
 
 ### 5.2 MaintenanceRegistry
 
@@ -481,7 +495,23 @@ A caller can **never** attribute a document to an organization it does not act f
 > `recordedAt` misrepresents the registry (audit AAP-12). Backdating is made *visible*,
 > not prevented.
 
-**Frontend:** → `/fleet/[assetId]` maintenance tab
+> **A maintenance record has no status.** The struct above is the whole record. There is
+> no `status` field, no edit, no delete and no lifecycle — a correction is a *new* record
+> referencing the prior one off-chain, because anything else would let a maintenance log
+> be rewritten. Any status rendered against a maintenance record is invented by the
+> interface. What *can* change is the standing of things the record points at: the
+> organization, and the supporting document. Neither retroactively invalidates it.
+
+> **The acting account is not stored, and not in the event.** `MaintenanceRecorded` and
+> `DocumentRegistered` both attribute to an *organization*; `msg.sender` appears in
+> neither. (`DocumentRevoked(documentId, by)` is the one exception.) To show who signed,
+> read the log's `transactionHash` and take the transaction's `from`.
+
+> **`credentialId` is emitted and never stored.** It pins a record to the exact
+> `MAINTENANCE_AUTHORITY` credential that authorised it — the audit trail that survives
+> the credential's later suspension or revocation. Unavailable to any storage read.
+
+**Frontend:** → `/maintenance`, `/maintenance/[id]`, and the `/assets/[id]` maintenance tab
 
 ### 5.3 AssetPassport
 
@@ -786,9 +816,11 @@ Found by comparing `/docs` against the compiled ABI.
 | D1 | "`freezeTransfers` … Permanent; **no unfreeze exists**" | `docs/permissions.md:53` | **Incorrect.** `AssetOwnership.unfreezeTransfers(uint256)` exists in the ABI and source, is `onlyAssetRegistry`, and is called at `AssetRegistry.sol:358` when a `RETIRED` asset returns to an operational status. `docs/state-machines.md` describes this correctly — the permission matrix is the stale document. |
 | D2 | "`DocumentRegistered.documentHash` **is** indexed, because duplicate detection is a user-facing query" | `docs/events.md:11–13` | **Incorrect.** `documentHash` is not indexed; the three indexed slots are `documentId`, `assetId`, `issuerOrgId`. The document's *own* signature block at `events.md:97–100` shows this correctly, so the prose contradicts the code beside it. Duplicate detection is served by the `documentIdOf(assetId, documentHash)` **view**, which is the better mechanism anyway — but a client built from the prose would write a log filter that silently returns nothing. |
 
-Both are documentation defects, not contract defects. **No Solidity change is required or
-proposed.** Flagged here because a frontend built from the prose would be wrong in both
-cases — silently, in D2's case.
+| D3 | "`documentHash` `keccak256` commitment to the document bytes. **Unique protocol-wide.**" | `src/interfaces/IDocumentRegistry.sol:74-75` (struct `@param` NatSpec) | **Incorrect, and contradicted 55 lines later by its own file.** Uniqueness is enforced **per asset**, through `documentIdByAssetAndHash`. The `DocumentHashTaken` NatSpec at `:125-131` states this correctly and explains why: a global index let anyone permanently burn a hash by claiming it against a junk asset they controlled, and could not represent a document covering a fleet (audit AAP-07). The struct comment is left over from before that fix. A client that trusted it would build a global "find this document anywhere" lookup that cannot exist. |
+
+All three are documentation defects, not contract defects. **No Solidity change is
+required or proposed.** Flagged here because a frontend built from the prose would be
+wrong in every case — silently, in D2's and D3's.
 
 ---
 
