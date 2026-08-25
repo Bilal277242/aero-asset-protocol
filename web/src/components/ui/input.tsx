@@ -4,12 +4,27 @@ import * as React from "react";
 import { cn } from "@/lib/utils/cn";
 
 /**
- * Text input.
+ * Text input — a well pressed into the surface.
+ *
+ * The inset shadow is the style; the **retained hairline border is the accessibility
+ * floor**. Pure soft UI drops the border and lets the shadow imply the field, which looks
+ * excellent and fails WCAG 1.4.11 — a same-hue shadow does not give a control's boundary
+ * 3:1 against its surroundings, and a form you cannot locate is not a style choice. So it
+ * gets both: the well for the look, a real edge so the field is findable.
  *
  * `mono` is not a style preference — it marks a field whose value is chain data
  * (an address, a hash, an amount, an id). The same split is used throughout the system
  * so a reader can tell protocol values from prose at a glance.
  */
+const fieldBase = [
+  "w-full rounded-sm bg-sunken text-ink shadow-inset-sm",
+  "border border-rule",
+  "transition-[box-shadow,border-color] duration-150",
+  "hover:border-ink-3",
+  "focus:border-accent",
+  "disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none",
+];
+
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   mono?: boolean;
   invalid?: boolean;
@@ -21,11 +36,10 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       ref={ref}
       aria-invalid={invalid || undefined}
       className={cn(
-        "h-8 w-full rounded border bg-panel px-2.5 text-sm text-ink transition-colors",
-        "border-rule hover:border-ink-3",
-        "disabled:cursor-not-allowed disabled:bg-sunken disabled:text-ink-3",
+        fieldBase,
+        "h-9 px-3 text-sm",
         mono && "font-mono text-xs",
-        invalid && "border-adverse hover:border-adverse",
+        invalid && "border-adverse hover:border-adverse focus:border-adverse",
         className,
       )}
       {...props}
@@ -42,11 +56,10 @@ export const Textarea = React.forwardRef<
     ref={ref}
     aria-invalid={invalid || undefined}
     className={cn(
-      "min-h-[72px] w-full rounded border bg-panel px-2.5 py-2 text-sm text-ink transition-colors",
-      "border-rule hover:border-ink-3",
-      "disabled:cursor-not-allowed disabled:bg-sunken disabled:text-ink-3",
+      fieldBase,
+      "min-h-[80px] px-3 py-2 text-sm",
       mono && "font-mono text-xs",
-      invalid && "border-adverse hover:border-adverse",
+      invalid && "border-adverse hover:border-adverse focus:border-adverse",
       className,
     )}
     {...props}
@@ -69,10 +82,9 @@ export const Select = React.forwardRef<
       ref={ref}
       aria-invalid={invalid || undefined}
       className={cn(
-        "h-8 w-full appearance-none rounded border bg-panel pl-2.5 pr-7 text-sm text-ink transition-colors",
-        "border-rule hover:border-ink-3",
-        "disabled:cursor-not-allowed disabled:bg-sunken disabled:text-ink-3",
-        invalid && "border-adverse",
+        fieldBase,
+        "h-9 appearance-none pl-3 pr-8 text-sm",
+        invalid && "border-adverse hover:border-adverse focus:border-adverse",
         className,
       )}
       {...props}

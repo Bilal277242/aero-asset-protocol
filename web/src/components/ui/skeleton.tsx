@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils/cn";
 export function Skeleton({ className }: { className?: string }) {
   return (
     <div
-      className={cn("relative overflow-hidden rounded-xs bg-sunken", className)}
+      className={cn("relative overflow-hidden rounded-xs bg-sunken shadow-inset-sm", className)}
       aria-hidden="true"
     >
       <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-rule-2 to-transparent" />
@@ -21,8 +21,8 @@ export function Skeleton({ className }: { className?: string }) {
 /** Skeleton shaped like the data table, so the page does not jump when rows land. */
 export function TableSkeleton({ rows = 6, cols = 5 }: { rows?: number; cols?: number }) {
   return (
-    <div className="rounded border border-rule bg-panel" role="status" aria-label="Loading">
-      <div className="flex gap-3 border-b border-rule bg-sunken px-3 py-2">
+    <div className="rounded-md bg-panel shadow-raised" role="status" aria-label="Loading">
+      <div className="flex gap-3 rounded-t-md bg-sunken px-3 py-2.5 shadow-inset-sm">
         {Array.from({ length: cols }).map((_, i) => (
           <Skeleton key={i} className="h-3 flex-1" />
         ))}
@@ -42,7 +42,7 @@ export function TableSkeleton({ rows = 6, cols = 5 }: { rows?: number; cols?: nu
 /** Skeleton shaped like a record detail. */
 export function RecordSkeleton({ rows = 6 }: { rows?: number }) {
   return (
-    <div className="rounded border border-rule bg-panel p-4" role="status" aria-label="Loading">
+    <div className="rounded-md bg-panel shadow-raised p-4" role="status" aria-label="Loading">
       <Skeleton className="mb-4 h-5 w-48" />
       <div className="grid gap-3">
         {Array.from({ length: rows }).map((_, i) => (

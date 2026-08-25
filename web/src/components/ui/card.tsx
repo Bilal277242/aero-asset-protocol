@@ -2,12 +2,14 @@ import * as React from "react";
 import { cn } from "@/lib/utils/cn";
 
 /**
- * A bordered surface.
+ * An extruded surface.
  *
  * Cards are for a single record's detail, never for browsing collections — a fleet is a
- * table. Consciously flat: a hairline border, no shadow, no accent rail. The rail-on-a-
- * rounded-card pattern is the visual signature of exactly the marketplace look this
- * product is not.
+ * table. The card is the same tone as the page and is separated from it purely by the
+ * raised shadow pair, which is the whole idea of soft UI: nothing is drawn on top of the
+ * page, things are pushed out of it.
+ *
+ * No border. A border plus a shadow reads as a card wearing a card.
  */
 export function Card({
   className,
@@ -15,7 +17,7 @@ export function Card({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("rounded border border-rule bg-panel", className)} {...props}>
+    <div className={cn("rounded-md bg-panel shadow-raised", className)} {...props}>
       {children}
     </div>
   );
@@ -35,7 +37,9 @@ export function CardHeader({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-start justify-between gap-3 border-b border-rule-2 px-4 py-3",
+        // A seam rather than a rule: on a shadow-built surface a hard 1px line cuts the
+        // extrusion in half and the card stops reading as one object.
+        "flex flex-wrap items-start justify-between gap-3 px-4 py-3 shadow-hairline",
         className,
       )}
       {...props}
@@ -57,7 +61,8 @@ export function CardFooter({ className, ...props }: React.HTMLAttributes<HTMLDiv
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center justify-end gap-2 border-t border-rule-2 bg-sunken px-4 py-2.5",
+        "flex flex-wrap items-center justify-end gap-2 rounded-b-md bg-sunken px-4 py-2.5",
+        "shadow-inset-sm",
         className,
       )}
       {...props}

@@ -65,10 +65,16 @@ export function TableWrap({
 
   return (
     <div className={cn("relative", className)}>
+      {/*
+        The table is a *well*, not an extrusion. Rows are dense and repetitive; giving
+        each one a raised edge would turn the register into gravel. One pressed-in
+        container holding flat rows keeps the density readable and still belongs to the
+        soft-UI vocabulary.
+      */}
       <div
         ref={ref}
         data-scrolled={edges.left ? "true" : "false"}
-        className="overflow-x-auto rounded border border-rule bg-panel"
+        className="overflow-x-auto rounded-md bg-panel shadow-raised"
         {...props}
       >
         {children}
@@ -77,7 +83,7 @@ export function TableWrap({
       <div
         aria-hidden="true"
         className={cn(
-          "pointer-events-none absolute inset-y-px right-px w-8 rounded-r",
+          "pointer-events-none absolute inset-y-1 right-1 w-8 rounded-r-md",
           "bg-gradient-to-l from-panel to-transparent",
           "transition-opacity duration-200",
           edges.right ? "opacity-100" : "opacity-0",
@@ -92,7 +98,7 @@ export function Table({ className, ...props }: React.TableHTMLAttributes<HTMLTab
 }
 
 export function THead({ className, ...props }: React.HTMLAttributes<HTMLTableSectionElement>) {
-  return <thead className={cn("bg-sunken", className)} {...props} />;
+  return <thead className={cn("bg-sunken shadow-inset-sm", className)} {...props} />;
 }
 
 export function TBody({ className, ...props }: React.HTMLAttributes<HTMLTableSectionElement>) {
@@ -131,7 +137,7 @@ export function TR({
         "border-b border-rule-2 last:border-0",
         interactive && [
           "cursor-pointer transition-colors duration-150",
-          "hover:bg-sunken focus-visible:bg-sunken",
+          "hover:bg-raised focus-visible:bg-raised",
           "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent",
         ],
         className,
@@ -151,7 +157,7 @@ export function TH({
     <th
       scope="col"
       className={cn(
-        "label-key whitespace-nowrap border-b border-rule px-3 py-2 text-left font-normal",
+        "label-key whitespace-nowrap px-3 py-2.5 text-left font-normal",
         numeric && "text-right",
         // The shadow appears only once the body has actually scrolled under the pinned
         // column — otherwise it reads as a permanent border in the middle of the table.

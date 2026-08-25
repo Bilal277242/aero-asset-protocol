@@ -127,7 +127,7 @@ function TopBar({
   menuOpen: boolean;
 }) {
   return (
-    <header className="sticky top-0 z-40 border-b border-rule bg-panel">
+    <header className="sticky top-0 z-40 bg-panel shadow-overlay">
       <div className="mx-auto flex h-12 w-full max-w-[1600px] items-center gap-3 px-4 tablet:px-6">
         <Button
           variant="ghost"
@@ -214,7 +214,7 @@ function Sidebar({
       {/* Permanent column, laptop and above. */}
       <nav
         aria-label="Primary"
-        className="sticky top-12 hidden h-[calc(100vh-48px)] w-[220px] shrink-0 border-r border-rule bg-panel laptop:block"
+        className="sticky top-12 hidden h-[calc(100vh-48px)] w-[220px] shrink-0 bg-panel shadow-hairline laptop:block"
       >
         <NavContents items={items} pathname={pathname} />
       </nav>
@@ -230,7 +230,7 @@ function Sidebar({
           <nav
             id="app-sidebar"
             aria-label="Primary"
-            className="fixed inset-y-0 left-0 top-12 z-40 w-[220px] animate-slide-in border-r border-rule bg-panel"
+            className="fixed inset-y-0 left-0 top-12 z-40 w-[220px] animate-slide-in bg-panel shadow-overlay"
           >
             <NavContents items={items} pathname={pathname} />
           </nav>
@@ -259,7 +259,7 @@ function NavContents({ items, pathname }: { items: NavItem[]; pathname: string }
                       href={item.href}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "flex items-center gap-2.5 rounded px-2 text-sm",
+                        "flex items-center gap-2.5 rounded-sm px-3 text-sm",
                         // 48px in the drawer, where a thumb is aiming; tighter on the
                         // permanent column, where a pointer is and density is worth more.
                         // `min-h-12`, not `min-h-11` — the spacing scale is deliberately
@@ -268,9 +268,11 @@ function NavContents({ items, pathname }: { items: NavItem[]; pathname: string }
                         "min-h-12 py-2 laptop:min-h-0 laptop:py-1.5",
                         "transition-colors duration-150",
                         "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent",
+                        // The active item is pressed in — the nav equivalent of a
+                        // latched switch, and the clearest "you are here" this style has.
                         active
-                          ? "bg-accent-subtle font-medium text-accent"
-                          : "text-ink-2 hover:bg-sunken hover:text-ink",
+                          ? "bg-sunken font-medium text-accent shadow-inset-sm"
+                          : "text-ink-2 hover:text-ink hover:shadow-raised-sm",
                       )}
                     >
                       <Icon className="size-4 shrink-0" aria-hidden="true" />

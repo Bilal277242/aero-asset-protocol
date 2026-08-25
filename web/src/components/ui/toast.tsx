@@ -70,7 +70,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               duration={t.duration === null ? Infinity : (t.duration ?? 5000)}
               onOpenChange={(open) => !open && dismiss(t.id)}
               className={cn(
-                "flex animate-slide-in items-start gap-2.5 rounded border border-rule bg-raised p-3 shadow-overlay",
+                "flex animate-slide-in items-start gap-2.5 rounded-md bg-raised p-3 shadow-overlay",
                 "data-[state=closed]:animate-fade-in",
               )}
             >

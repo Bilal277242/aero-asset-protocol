@@ -9,9 +9,14 @@ import { Spinner } from "./spinner";
 /**
  * Buttons.
  *
- * Square-ish by design — 4px, not a pill. Aircraft placards, data plates and technical
- * drawings have corners; the geometry is where a lot of the "not a consumer app" feeling
- * actually lives.
+ * The one place soft UI genuinely earns its keep: a button is a physical metaphor, so
+ * being extruded at rest and **pressed in on `:active`** is not decoration, it is the
+ * affordance. Every variant swaps `shadow-raised-sm` for `shadow-inset-sm` on press.
+ *
+ * `primary` and `danger` keep a solid fill rather than becoming tinted extrusions. A
+ * filled control is the only thing on the page that reads instantly as *the* action, and
+ * dissolving it into the background to match a style would cost more than it buys — they
+ * take the shadow as well, so they still belong to the same world.
  *
  * `danger` is reserved for irreversible protocol actions (revoke, destroy, resolve a
  * dispute). It is not a synonym for "delete" and should stay rare enough to mean
@@ -20,24 +25,39 @@ import { Spinner } from "./spinner";
 const buttonVariants = cva(
   [
     "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded",
-    "font-medium transition-colors select-none",
-    "disabled:pointer-events-none disabled:opacity-45",
+    "font-medium select-none",
+    "transition-[box-shadow,background-color,color,transform] duration-150",
+    "disabled:pointer-events-none disabled:opacity-45 disabled:shadow-none",
     "[&_svg]:shrink-0",
   ],
   {
     variants: {
       variant: {
-        primary: "bg-accent text-accent-ink hover:bg-accent-hover",
-        secondary: "border border-rule bg-panel text-ink hover:bg-sunken hover:border-ink-3",
-        ghost: "text-ink-2 hover:bg-sunken hover:text-ink",
-        danger: "bg-adverse text-ink-inv hover:opacity-90",
+        primary: [
+          "bg-accent text-accent-ink shadow-raised-sm",
+          "hover:bg-accent-hover",
+          "active:shadow-inset-sm",
+        ],
+        secondary: [
+          "bg-panel text-ink shadow-raised-sm",
+          "hover:text-accent",
+          "active:shadow-inset-sm",
+        ],
+        // Flush until touched, then lifts. The one control that starts flat, because a
+        // toolbar of extruded ghosts is indistinguishable from a toolbar of buttons.
+        ghost: "text-ink-2 hover:text-ink hover:shadow-raised-sm active:shadow-inset-sm",
+        danger: [
+          "bg-adverse text-ink-inv shadow-raised-sm",
+          "hover:opacity-90",
+          "active:shadow-inset-sm",
+        ],
         link: "text-accent underline underline-offset-2 hover:text-accent-hover",
       },
       size: {
-        sm: "h-7 px-2.5 text-xs [&_svg]:size-3.5",
-        md: "h-8 px-3 text-sm [&_svg]:size-4",
-        lg: "h-10 px-4 text-base [&_svg]:size-4",
-        icon: "h-8 w-8 [&_svg]:size-4",
+        sm: "h-8 px-3 text-xs [&_svg]:size-3.5",
+        md: "h-9 px-4 text-sm [&_svg]:size-4",
+        lg: "h-11 px-5 text-base [&_svg]:size-4",
+        icon: "h-9 w-9 [&_svg]:size-4",
       },
     },
     defaultVariants: { variant: "secondary", size: "md" },

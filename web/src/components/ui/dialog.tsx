@@ -22,7 +22,7 @@ export const DialogContent = React.forwardRef<
       ref={ref}
       className={cn(
         "fixed left-1/2 top-1/2 z-50 w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2",
-        "animate-scale-in rounded-lg border border-rule bg-raised shadow-modal",
+        "animate-scale-in rounded-xl bg-raised shadow-modal",
         // A three-row grid — header, body, footer — so only the body scrolls. When the
         // whole dialog scrolled, a long transaction summary pushed the confirm button
         // off the bottom on a phone, which is precisely the control you must not lose
@@ -41,7 +41,10 @@ export const DialogContent = React.forwardRef<
     >
       {children}
       <DialogPrimitive.Close
-        className="absolute right-3 top-3 rounded p-1 text-ink-3 transition-colors hover:bg-sunken hover:text-ink"
+        className={cn(
+          "absolute right-4 top-4 rounded-full bg-panel p-1.5 text-ink-3 shadow-raised-sm",
+          "transition-[box-shadow,color] duration-150 hover:text-ink active:shadow-inset-sm",
+        )}
         aria-label="Close"
       >
         <X className="size-4" />
@@ -52,7 +55,7 @@ export const DialogContent = React.forwardRef<
 DialogContent.displayName = "DialogContent";
 
 export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("border-b border-rule-2 px-4 py-3 pr-10", className)} {...props} />;
+  return <div className={cn("px-5 py-4 pr-12 shadow-hairline", className)} {...props} />;
 }
 
 export const DialogTitle = React.forwardRef<
@@ -81,14 +84,14 @@ DialogDescription.displayName = "DialogDescription";
 
 /** The only scrolling region. `min-h-0` is what lets it actually shrink inside the grid. */
 export function DialogBody({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("min-h-0 overflow-y-auto px-4 py-4", className)} {...props} />;
+  return <div className={cn("min-h-0 overflow-y-auto px-5 py-4", className)} {...props} />;
 }
 
 export function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        "flex flex-col-reverse gap-2 border-t border-rule-2 bg-sunken px-4 py-3",
+        "flex flex-col-reverse gap-2 rounded-b-xl bg-sunken px-5 py-4 shadow-inset-sm",
         "tablet:flex-row tablet:justify-end",
         className,
       )}

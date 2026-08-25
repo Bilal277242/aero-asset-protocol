@@ -10,14 +10,17 @@ import { cn } from "@/lib/utils/cn";
  * Keeping the two apart stops the palette from becoming decoration.
  */
 const badgeVariants = cva(
-  "inline-flex items-center gap-1 rounded-xs border px-1.5 py-0.5 font-mono text-3xs uppercase whitespace-nowrap",
+  "inline-flex items-center gap-1 rounded-xs px-2 py-0.5 font-mono text-3xs uppercase whitespace-nowrap",
   {
     variants: {
       variant: {
-        neutral: "border-rule bg-sunken text-ink-2",
-        accent: "border-accent/40 bg-accent-subtle text-accent",
-        outline: "border-rule bg-transparent text-ink-3",
-        solid: "border-transparent bg-ink text-ground",
+        // Pressed into the surface. A badge is a label, not a control, so it reads
+        // better recessed than extruded — and it keeps chips from competing with the
+        // buttons beside them.
+        neutral: "bg-sunken text-ink-2 shadow-inset-sm",
+        accent: "bg-accent-subtle text-accent shadow-inset-sm",
+        outline: "border border-rule bg-transparent text-ink-3",
+        solid: "bg-ink text-ground shadow-raised-sm",
       },
     },
     defaultVariants: { variant: "neutral" },
