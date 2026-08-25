@@ -3,57 +3,89 @@
 @tailwind utilities;
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   AeroAsset design tokens.
+   AeroAsset design tokens — neumorphic (soft UI).
 
    Light is the primary palette. Enterprise aviation software is used in daylight
-   offices and gets printed; dark is a genuine second mode, not the identity. That
-   choice alone does most of the work of not looking like a crypto app.
+   offices and gets printed; dark is a genuine second mode, not the identity.
 
    Neutrals carry a deliberate blue-green bias toward the accent — a pure grey reads
    as unconsidered. Semantic colours are named for meaning, never hue.
+
+   ── How this style works ──────────────────────────────────────────────────
+   A neumorphic surface is the *same tone as the page behind it*. It gains form from
+   a pair of shadows: a light one up-left where the light would fall, a dark one
+   down-right where it would not. Raised is that pair on the outside; inset is the
+   same pair inverted and inside. Borders mostly go away, because the shadow is doing
+   their job.
+
+   ── The rule that keeps this honest ───────────────────────────────────────
+   Soft UI earns its look by dissolving edges, which is in direct tension with WCAG
+   1.4.11: a control's boundary needs 3:1 against what surrounds it, and a shadow of
+   the same hue does not supply that. So the softness is applied to *surfaces* —
+   cards, panels, wells, buttons — and never to meaning. Text keeps its contrast, the
+   semantic state colours keep theirs, and anything a user must find (inputs, focus)
+   keeps a real edge in addition to the shadow. A field you cannot locate is not a
+   style, it is a defect.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* ── Surfaces ───────────────────────────────────────────────────────── */
-  --ground: #eef1f4;   /* page                                              */
-  --panel: #ffffff;    /* cards, tables, the reading surface                */
-  --raised: #ffffff;   /* modals, popovers — separated by shadow, not tint  */
-  --sunken: #f6f8fa;   /* table headers, inset wells, code                  */
+  /* ── Surfaces. Deliberately near-identical: depth comes from shadow. ─── */
+  --ground: #e7ecf3;   /* page                                              */
+  --panel: #e7ecf3;    /* cards, panels — extruded from the page, not tinted*/
+  --raised: #ebeff5;   /* modals, popovers — a half-step up                 */
+  --sunken: #e1e7f0;   /* wells, table headers, code — pressed in           */
 
-  /* ── Ink ────────────────────────────────────────────────────────────── */
-  --ink: #0e151b;      /* primary text                                      */
-  --ink-2: #52606c;    /* secondary — labels, descriptions                  */
-  --ink-3: #7a8792;    /* tertiary — captions, placeholders, units          */
+  /* ── The two lights. Everything three-dimensional is built from these. ─ */
+  --nm-light: #ffffff;              /* up-left highlight                    */
+  --nm-dark: rgba(158, 172, 190, 0.62); /* down-right depth                 */
+
+  /* ── Ink. Untouched by the restyle — contrast is not negotiable. ─────── */
+  /* Measured against --ground, not guessed. Raising the page from #eef1f4 to a
+     mid-tone the shadows can work on costs contrast at the light end, so the
+     tertiary ink had to come down with it — it was 4.14:1 before, under the 4.5
+     floor for the captions and placeholders it is used for. */
+  --ink: #101820;      /* primary text            — 15.1:1 on --ground      */
+  --ink-2: #46535f;    /* secondary               —  6.6:1                  */
+  --ink-3: #5b6773;    /* tertiary                —  4.9:1                  */
   --ink-inv: #ffffff;  /* on accent                                         */
 
-  /* ── Rules. Hairlines do the work shadows would do elsewhere. ───────── */
-  --rule: #d1d8de;
-  --rule-2: #e5eaee;   /* internal dividers, lighter                        */
-  --rule-strong: #0e151b;
+  /* ── Rules. Mostly retired; kept where an edge still carries meaning. ── */
+  --rule: #cfd7e2;
+  --rule-2: #dbe2ec;   /* internal dividers, lighter                        */
+  --rule-strong: #101820;
 
   /* ── Accent: petrol. CAA document ink, instrument bezels. ───────────── */
   --accent: #0b5d6b;
   --accent-hover: #084853;
-  --accent-subtle: #e6f2f4;
+  --accent-subtle: #d9e6ea;
   --accent-ink: #ffffff;
 
   /* ── Semantic state. Four values, not three. ────────────────────────── */
-  --confirmed: #1d6b47;      /* the chain asserts it, now                   */
-  --confirmed-bg: #e3f0e9;
-  --blocked: #8a5804;        /* an action would revert                      */
-  --blocked-bg: #f7edd9;
-  --adverse: #9c2a2a;        /* terminal or hostile                         */
-  --adverse-bg: #f7e5e5;
-  --unrecorded: #5b4a93;     /* true by time, not yet written to the chain  */
-  --unrecorded-bg: #ece8f6;
+  --confirmed: #1a6242;      /* the chain asserts it, now                   */
+  --confirmed-bg: #d7e6dd;
+  --blocked: #7d4f04;        /* an action would revert                      */
+  --blocked-bg: #efe2c9;
+  --adverse: #8f2626;        /* terminal or hostile                         */
+  --adverse-bg: #eedada;
+  --unrecorded: #524186;     /* true by time, not yet written to the chain  */
+  --unrecorded-bg: #e0dcee;
 
-  --focus: #0e7787;
+  --focus: #0b5d6b;
 
-  /* ── Elevation. Restrained on purpose: technical documents use rules. ─ */
-  --shadow-hairline: 0 1px 0 rgba(14, 21, 27, 0.04);
-  --shadow-raised: 0 1px 2px rgba(14, 21, 27, 0.07), 0 1px 1px rgba(14, 21, 27, 0.04);
-  --shadow-overlay: 0 4px 12px rgba(14, 21, 27, 0.1), 0 1px 3px rgba(14, 21, 27, 0.06);
-  --shadow-modal: 0 16px 48px rgba(14, 21, 27, 0.18), 0 2px 8px rgba(14, 21, 27, 0.08);
+  /* ── Elevation. The whole style lives here. ──────────────────────────── */
+  /* Raised: light up-left, dark down-right. Two sizes — dense UI cannot
+     carry a 12px blur on every chip without turning to mush. */
+  --shadow-raised-sm: -2px -2px 5px var(--nm-light), 2px 2px 5px var(--nm-dark);
+  --shadow-raised: -5px -5px 12px var(--nm-light), 5px 5px 12px var(--nm-dark);
+  --shadow-overlay: -8px -8px 20px var(--nm-light), 10px 10px 26px var(--nm-dark);
+  --shadow-modal: -10px -10px 30px var(--nm-light), 14px 14px 40px var(--nm-dark);
+
+  /* Inset: the same pair, inverted and inside. Wells, inputs, pressed. */
+  --shadow-inset-sm: inset 2px 2px 4px var(--nm-dark), inset -2px -2px 4px var(--nm-light);
+  --shadow-inset: inset 4px 4px 9px var(--nm-dark), inset -4px -4px 9px var(--nm-light);
+
+  /* Retained name, reused meaning: the faintest possible seam. */
+  --shadow-hairline: inset 0 -1px 0 rgba(158, 172, 190, 0.35);
 
   /* ── Type ───────────────────────────────────────────────────────────── */
   --font-sans: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont,
@@ -62,41 +94,56 @@
     Consolas, "DejaVu Sans Mono", monospace;
 }
 
+/*
+  Dark soft UI is the harder half. The trick that works in light — a white highlight —
+  produces a glowing plastic rim on a dark ground. The highlight here is instead a
+  *slightly lighter grey than the surface*, and the depth shadow is near-black. The
+  ground also has to lift well off pure black, or there is no room below it for a
+  shadow to be seen at all.
+*/
 .dark {
-  --ground: #090e13;
-  --panel: #101820;
-  --raised: #16202a;
-  --sunken: #0d141b;
+  --ground: #262b33;
+  --panel: #262b33;
+  --raised: #2b313a;
+  --sunken: #21262d;
 
-  --ink: #e2e9ef;
-  --ink-2: #8c9aa7;
-  --ink-3: #6a7783;
-  --ink-inv: #061014;
+  --nm-light: rgba(60, 68, 80, 0.75);
+  --nm-dark: rgba(12, 15, 19, 0.75);
 
-  --rule: #233038;
-  --rule-2: #1a242e;
-  --rule-strong: #e2e9ef;
+  --ink: #e4eaf1;      /* 11.8:1 on --ground */
+  --ink-2: #a4b0bd;    /*  6.5:1 */
+  --ink-3: #8a97a5;    /*  4.7:1 — 4.48 before, which misses the 4.5 floor */
+  --ink-inv: #0b1116;
 
-  --accent: #55c2d2;
-  --accent-hover: #7bd5e2;
-  --accent-subtle: #10262c;
-  --accent-ink: #061014;
+  --rule: #363d47;
+  --rule-2: #2f353e;
+  --rule-strong: #e4eaf1;
 
-  --confirmed: #57c08a;
-  --confirmed-bg: #0f2419;
-  --blocked: #d9a23b;
-  --blocked-bg: #292012;
-  --adverse: #e2776f;
-  --adverse-bg: #2a1716;
-  --unrecorded: #a99ad8;
-  --unrecorded-bg: #1d1830;
+  --accent: #5cc6d6;
+  --accent-hover: #83d8e4;
+  --accent-subtle: #223640;
+  --accent-ink: #0b1116;
 
-  --focus: #55c2d2;
+  --confirmed: #62c894;
+  --confirmed-bg: #21362c;
+  --blocked: #e0aa47;
+  --blocked-bg: #38301d;
+  --adverse: #ea8078;
+  --adverse-bg: #3a2725;
+  --unrecorded: #b2a3e0;
+  --unrecorded-bg: #2e2942;
 
-  --shadow-hairline: 0 1px 0 rgba(0, 0, 0, 0.3);
-  --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --shadow-overlay: 0 4px 12px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.4);
-  --shadow-modal: 0 16px 48px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.5);
+  --focus: #5cc6d6;
+
+  --shadow-raised-sm: -2px -2px 5px var(--nm-light), 2px 2px 5px var(--nm-dark);
+  --shadow-raised: -5px -5px 12px var(--nm-light), 5px 5px 12px var(--nm-dark);
+  --shadow-overlay: -8px -8px 20px var(--nm-light), 10px 10px 26px var(--nm-dark);
+  --shadow-modal: -10px -10px 30px var(--nm-light), 14px 14px 40px var(--nm-dark);
+
+  --shadow-inset-sm: inset 2px 2px 4px var(--nm-dark), inset -2px -2px 4px var(--nm-light);
+  --shadow-inset: inset 4px 4px 9px var(--nm-dark), inset -4px -4px 9px var(--nm-light);
+
+  --shadow-hairline: inset 0 -1px 0 rgba(12, 15, 19, 0.5);
 }
 
 @layer base {

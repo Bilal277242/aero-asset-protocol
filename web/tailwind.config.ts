@@ -45,13 +45,17 @@ const config: Config = {
 
       focus: "var(--focus)",
     },
+    // Soft UI needs room for the shadow to turn the corner. A 4px radius under a 12px
+    // blur reads as a smudged square, so the whole scale moves up; the small end is
+    // kept for chips and inline marks, which would look like pills if they grew too.
     borderRadius: {
       none: "0",
-      xs: "2px",
-      sm: "3px",
-      DEFAULT: "4px",
-      md: "4px",
-      lg: "6px",
+      xs: "5px",
+      sm: "7px",
+      DEFAULT: "10px",
+      md: "12px",
+      lg: "16px",
+      xl: "22px",
       full: "9999px",
     },
     fontFamily: {
@@ -71,6 +75,11 @@ const config: Config = {
       "3xl": ["32px", { lineHeight: "38px", letterSpacing: "-0.025em" }],
       "4xl": ["40px", { lineHeight: "46px", letterSpacing: "-0.03em" }],
     },
+    // Restricted on purpose, but it was restricted *below what the components already
+    // asked for*: `size-3.5` on every icon, `py-2.5` on half the surfaces, `h-7`/`h-9`
+    // on buttons. Tailwind emits nothing for a value outside the scale, so those classes
+    // silently did nothing and the icons fell back to lucide's intrinsic 24px. The gaps
+    // the system actually uses are now in it.
     spacing: {
       0: "0",
       px: "1px",
@@ -78,23 +87,34 @@ const config: Config = {
       1: "4px",
       1.5: "6px",
       2: "8px",
+      2.5: "10px",
       3: "12px",
+      3.5: "14px",
       4: "16px",
       5: "20px",
       6: "24px",
+      7: "28px",
       8: "32px",
+      9: "36px",
       10: "40px",
+      11: "44px",
       12: "48px",
+      14: "56px",
       16: "64px",
       20: "80px",
       24: "96px",
     },
+    // The neumorphic vocabulary. `raised` extrudes a surface from the page, `inset`
+    // presses it in; everything else is a size of one of those two ideas.
     boxShadow: {
       none: "none",
       hairline: "var(--shadow-hairline)",
+      "raised-sm": "var(--shadow-raised-sm)",
       raised: "var(--shadow-raised)",
       overlay: "var(--shadow-overlay)",
       modal: "var(--shadow-modal)",
+      "inset-sm": "var(--shadow-inset-sm)",
+      inset: "var(--shadow-inset)",
     },
     extend: {
       screens: {
