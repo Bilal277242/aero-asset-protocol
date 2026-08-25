@@ -76,3 +76,21 @@ export const EXPLORER_BASE = "https://sepolia.etherscan.io";
 
 export const explorerTx = (hash: string) => `${EXPLORER_BASE}/tx/${hash}`;
 export const explorerAddress = (address: string) => `${EXPLORER_BASE}/address/${address}`;
+
+/**
+ * WalletConnect project id.
+ *
+ * Optional and additive: unset, `lib/web3/config.ts` leaves the WalletConnect connector
+ * out of the wagmi config entirely and the app falls back to browser-extension wallets
+ * only — nothing else changes, nothing throws. This is deliberately **not** run through
+ * `required()`, unlike the RPC endpoint and address registry above: those are load-bearing
+ * for the app to function at all, this is one of two ways to connect a wallet.
+ *
+ * A project id is a publishable client identifier — WalletConnect's own dashboard is
+ * built around embedding it in a public browser bundle, the same way a Stripe
+ * *publishable* key is meant to be public. It authorizes relay quota, not access to
+ * anything. It is still never hardcoded here and never committed: it comes from the
+ * environment so revoking or rotating it is a config change, not a code change.
+ */
+export const WALLETCONNECT_PROJECT_ID =
+  process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID?.trim() || null;

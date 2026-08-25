@@ -57,12 +57,30 @@ export function decodeError(error: unknown): DecodedError {
   for (const node of nodes) {
     const name = String(node.name ?? "");
     const code = node.code;
-    if (name === "UserRejectedRequestError" || code === 4001 || code === "ACTION_REJECTED") {
+    // 4001 / ACTION_REJECTED are the EIP-1193 shape injected wallets use. WalletConnect
+    // sessions reject through its own SDK error table instead (`@walletconnect/utils`'s
+    // `getSdkError`, read out of the installed package rather than guessed):
+    // USER_REJECTED = 5000, and 5001–5003 for a wallet accepting a session but rejecting
+    // one of the chains, methods or events it requested — same decision, same tone.
+    if (
+      name === "UserRejectedRequestError" ||
+      code === 4001 ||
+      code === "ACTION_REJECTED" ||
+      code === 5000 ||
+      code === 5001 ||
+      code === 5002 ||
+      code === 5003
+    ) {
       return { kind: "user-rejected" };
     }
   }
-  if (/user (rejected|denied)|request rejected/i.test(messageOf(error))) {
-    return { kind: "user-rejected" };
+  // Every node, not only the top-level error: a rejection from a connector two or three
+  // wrappers deep (WalletConnect's session-proposal rejection arrives inside wagmi's own
+  // connector error) can lose its code along the way while the message survives.
+  for (const node of nodes) {
+    if (/user (rejected|denied)|request rejected/i.test(messageOf(node))) {
+      return { kind: "user-rejected" };
+    }
   }
 
   // ── Already-decoded revert ───────────────────────────────────────────────
