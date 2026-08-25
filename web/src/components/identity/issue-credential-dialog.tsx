@@ -256,7 +256,7 @@ export function IssueCredentialDialog({
         </Field>
 
         {parsedOrgId !== null && (
-          <div className="rounded border border-rule bg-sunken p-3">
+          <div className="rounded-sm bg-sunken shadow-inset-sm p-3">
             <p className="label-key mb-2">Protocol preconditions</p>
             {check.isLoading ? (
               <p className="text-xs text-ink-3">Checking…</p>

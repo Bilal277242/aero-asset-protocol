@@ -115,7 +115,7 @@ export function UpdateOrganizationDialog({
           <Input id="uo-uri" mono value={uri} onChange={(e) => setUri(e.target.value)} />
         </Field>
 
-        <label className="flex cursor-pointer items-start gap-2 rounded border border-rule bg-sunken p-3">
+        <label className="flex cursor-pointer items-start gap-2 rounded-sm bg-sunken shadow-inset-sm p-3">
           <input
             type="checkbox"
             checked={changeHash}

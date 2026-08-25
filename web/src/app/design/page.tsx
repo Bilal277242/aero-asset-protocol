@@ -210,7 +210,7 @@ export default function DesignSystemPage() {
                 ].map(([label, cls]) => (
                   <div
                     key={label}
-                    className={`rounded border border-rule bg-panel px-3 py-2 font-mono text-2xs text-ink-2 ${cls}`}
+                    className={`rounded-md bg-panel shadow-raised px-3 py-2 font-mono text-2xs text-ink-2 ${cls}`}
                   >
                     {label}
                   </div>
@@ -547,7 +547,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 function Swatch({ name, varName, note }: { name: string; varName: string; note: string }) {
   return (
-    <div className="overflow-hidden rounded border border-rule bg-panel">
+    <div className="overflow-hidden rounded-md bg-panel shadow-raised">
       <div className="h-14" style={{ background: `var(${varName})` }} />
       <div className="p-2">
         <span className="block font-mono text-2xs font-bold text-ink">{name}</span>

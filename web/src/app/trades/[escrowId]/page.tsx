@@ -273,7 +273,7 @@ export default function TradeDetailPage() {
           ) : (timeline.data?.length ?? 0) === 0 ? (
             <p className="text-sm text-ink-3">No events recorded against this escrow yet.</p>
           ) : (
-            <ol className="grid gap-px overflow-hidden rounded border border-rule bg-rule">
+            <ol className="grid gap-px overflow-hidden rounded-md bg-rule shadow-raised">
               {timeline.data?.map((e) => (
                 <li key={e.id} className="flex flex-col gap-1 bg-panel p-3 tablet:flex-row tablet:items-baseline tablet:gap-4">
                   <span className="min-w-0 flex-1">

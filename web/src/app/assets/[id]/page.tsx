@@ -494,7 +494,7 @@ export default function AssetPassportPage() {
                 </Table>
               </TableWrap>
 
-              <div className="mt-3 rounded border border-rule bg-panel p-3">
+              <div className="mt-3 rounded-md bg-panel shadow-raised p-3">
                 <p className="text-sm font-medium text-ink">
                   Two dates, and only one of them is witnessed
                 </p>
@@ -576,7 +576,7 @@ export default function AssetPassportPage() {
               </TableWrap>
 
               <div className="mt-3 grid gap-2 laptop:grid-cols-2">
-                <div className="rounded border border-rule bg-panel p-3">
+                <div className="rounded-md bg-panel shadow-raised p-3">
                   <p className="text-sm font-medium text-ink">What the commitment proves</p>
                   <p className="mt-1 text-xs leading-relaxed text-ink-2">
                     Each hash is a <code className="font-mono text-2xs">keccak256</code>{" "}
@@ -727,7 +727,7 @@ export default function AssetPassportPage() {
             />
           ) : (
             <>
-              <ol className="grid gap-px overflow-hidden rounded border border-rule bg-rule">
+              <ol className="grid gap-px overflow-hidden rounded-md bg-rule shadow-raised">
                 {timeline.data?.map((e) => (
                   <li key={e.id} className="bg-panel p-3">
                     <div className="flex flex-col gap-1 tablet:flex-row tablet:items-baseline tablet:gap-4">

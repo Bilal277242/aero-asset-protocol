@@ -123,8 +123,15 @@ export function AdminAction({
   return (
     <div
       className={cn(
-        "rounded border p-3",
-        action.irreversible ? "border-adverse/40" : action.danger ? "border-blocked/40" : "border-rule",
+        "rounded-sm p-3.5",
+        // A dangerous action keeps a coloured edge. The soft treatment is for ordinary
+        // surfaces; a control that can revoke an organization should not be the same
+        // shape as the card around it.
+        action.irreversible
+          ? "border border-adverse/45 bg-adverse-bg/30"
+          : action.danger
+            ? "border border-blocked/45 bg-blocked-bg/30"
+            : "bg-panel shadow-raised-sm",
       )}
     >
       {/*
@@ -246,7 +253,7 @@ export function AdminAction({
             {children}
 
             {calldata && (
-              <details className="rounded-xs border border-rule bg-sunken px-2.5 py-2">
+              <details className="rounded-xs bg-sunken shadow-inset-sm px-2.5 py-2">
                 <summary className="cursor-pointer text-2xs text-ink-2">
                   Calldata for this call
                 </summary>

@@ -68,7 +68,7 @@ export default function PlatformPage() {
 
       <Section>
         <SectionHead eyebrow="Architecture" title="The layers" />
-        <div className="mt-8 grid gap-px overflow-hidden rounded border border-rule bg-rule">
+        <div className="mt-8 grid gap-px overflow-hidden rounded-md bg-rule shadow-raised">
           {LAYERS.map((l) => (
             <div key={l.id} className="grid gap-2 bg-panel p-4 laptop:grid-cols-[100px_1fr]">
               <div>
@@ -169,7 +169,7 @@ export default function PlatformPage() {
           lede="Stated plainly, because the alternative is letting a reader assume more than is true."
         />
         <div className="mt-6 grid gap-4 laptop:grid-cols-2">
-          <div className="rounded border border-rule bg-panel p-4">
+          <div className="rounded-md bg-panel shadow-raised p-4">
             <p className="label-key mb-2">Completed</p>
             <ul className="grid gap-1.5 text-sm text-ink-2">
               <li>Full test suite including fuzz and protocol-level invariant tests</li>

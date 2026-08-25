@@ -112,7 +112,7 @@ export default function DocumentationPage() {
           ))}
         </div>
 
-        <div className="mt-6 rounded border border-rule bg-panel p-4">
+        <div className="mt-6 rounded-md bg-panel shadow-raised p-4">
           <p className="text-sm font-medium text-ink">Three constraints worth knowing before you integrate</p>
           <ul className="mt-2 grid gap-2 text-sm leading-relaxed text-ink-2">
             <li>
@@ -184,7 +184,7 @@ export default function DocumentationPage() {
           <Card>
             <CardHeader title="Contracts" description="Foundry" />
             <CardBody>
-              <pre className="overflow-x-auto rounded-xs border border-rule bg-sunken p-3 font-mono text-2xs leading-relaxed text-ink-2">
+              <pre className="overflow-x-auto rounded-xs bg-sunken shadow-inset-sm p-3 font-mono text-2xs leading-relaxed text-ink-2">
 {`git clone --recurse-submodules \\
   ${REPO.replace("https://", "")}
 cd aero-asset-protocol
@@ -200,7 +200,7 @@ forge test`}
           <Card>
             <CardHeader title="Interface" description="Next.js" />
             <CardBody>
-              <pre className="overflow-x-auto rounded-xs border border-rule bg-sunken p-3 font-mono text-2xs leading-relaxed text-ink-2">
+              <pre className="overflow-x-auto rounded-xs bg-sunken shadow-inset-sm p-3 font-mono text-2xs leading-relaxed text-ink-2">
 {`cd web
 npm install
 npm run dev`}

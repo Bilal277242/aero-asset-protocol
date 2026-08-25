@@ -112,7 +112,7 @@ export function OperatorsDialog({
           </Select>
         </Field>
 
-        <p className="rounded-xs border border-rule bg-sunken px-2.5 py-2 text-2xs leading-relaxed text-ink-2">
+        <p className="rounded-xs bg-sunken shadow-inset-sm px-2.5 py-2 text-2xs leading-relaxed text-ink-2">
           Operator rights only take effect while the organization is{" "}
           <strong className="font-medium text-ink">verified</strong>.{" "}
           <code className="font-mono">isActingFor</code> returns false for any other status,

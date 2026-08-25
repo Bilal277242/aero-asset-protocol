@@ -14,6 +14,12 @@ import { cn } from "@/lib/utils/cn";
  * own value.
  *
  * Every chip carries a **text label**, so state is never encoded by colour alone.
+ *
+ * **Deliberately exempt from the soft-UI treatment.** Every other small surface in the
+ * system is recessed or extruded by shadow; a chip keeps a real, semantically coloured
+ * border. Its whole job is to be distinguishable at a glance across a dense table, and
+ * that is precisely what dissolving edges into same-hue shadow destroys. The style stops
+ * where meaning starts.
  */
 export type StateTone = "confirmed" | "blocked" | "adverse" | "unrecorded" | "neutral";
 

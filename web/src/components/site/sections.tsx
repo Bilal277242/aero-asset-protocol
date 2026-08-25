@@ -111,7 +111,7 @@ export function FeatureCard({
   className?: string;
 }) {
   return (
-    <div className={cn("rounded border border-rule bg-panel p-4", className)}>
+    <div className={cn("rounded-md bg-panel shadow-raised p-4", className)}>
       {Icon && <Icon className="mb-3 size-5 text-accent" aria-hidden="true" />}
       <h3 className="text-md font-semibold tracking-tight text-ink">{title}</h3>
       <div className="mt-1.5 text-sm leading-relaxed text-ink-2">{children}</div>
@@ -136,7 +136,7 @@ export function Steps({
   className?: string;
 }) {
   return (
-    <ol className={cn("grid gap-px overflow-hidden rounded border border-rule bg-rule", className)}>
+    <ol className={cn("grid gap-px overflow-hidden rounded-md bg-rule shadow-raised", className)}>
       {steps.map((s, i) => (
         <li key={s.title} className="grid gap-1 bg-panel p-4 tablet:grid-cols-[40px_1fr] tablet:gap-4">
           <span className="font-mono text-sm font-bold text-accent">
@@ -164,7 +164,7 @@ export function FactStrip({
   return (
     <dl
       className={cn(
-        "grid gap-px overflow-hidden rounded border border-rule bg-rule",
+        "grid gap-px overflow-hidden rounded-md bg-rule shadow-raised",
         "tablet:grid-cols-2 laptop:grid-cols-4",
         className,
       )}
@@ -198,7 +198,7 @@ export function CTABand({
   return (
     <div
       className={cn(
-        "rounded border border-rule bg-panel px-5 py-8 text-center laptop:px-10 laptop:py-12",
+        "rounded-md bg-panel shadow-raised px-5 py-8 text-center laptop:px-10 laptop:py-12",
         className,
       )}
     >
@@ -218,7 +218,7 @@ export function CTABand({
         {secondary && (
           <Link
             href={secondary.href}
-            className="inline-flex h-10 items-center justify-center rounded border border-rule bg-panel px-5 text-base font-medium text-ink transition-colors hover:border-ink-3 hover:bg-sunken"
+            className="inline-flex h-10 items-center justify-center rounded-md bg-panel shadow-raised px-5 text-base font-medium text-ink transition-colors hover:border-ink-3 hover:bg-sunken"
           >
             {secondary.label}
           </Link>

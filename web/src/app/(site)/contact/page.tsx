@@ -75,7 +75,7 @@ export default function ContactPage() {
 
         {/* A form would need a server to receive it, and there isn't one. Saying so is
             better than shipping a form that silently discards what people write. */}
-        <div className="mt-6 rounded border border-rule bg-panel p-4">
+        <div className="mt-6 rounded-md bg-panel shadow-raised p-4">
           <p className="text-sm font-medium text-ink">Why there is no contact form here</p>
           <p className="mt-1 max-w-[76ch] text-sm leading-relaxed text-ink-2">
             A form needs a server to receive it and someone to monitor the inbox. This project
@@ -106,7 +106,7 @@ export default function ContactPage() {
               a: "No, and neither can anyone else — that is the point. Documents can be superseded or revoked and both remain visible; maintenance records cannot be amended, only added to. An append-only history that someone can edit is not a history.",
             },
           ].map((f) => (
-            <div key={f.q} className="rounded border border-rule bg-panel p-4">
+            <div key={f.q} className="rounded-md bg-panel shadow-raised p-4">
               <p className="text-sm font-medium text-ink">{f.q}</p>
               <p className="mt-1 max-w-[76ch] text-sm leading-relaxed text-ink-2">{f.a}</p>
             </div>

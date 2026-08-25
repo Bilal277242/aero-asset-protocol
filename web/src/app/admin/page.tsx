@@ -125,13 +125,13 @@ export default function AdminPage() {
                 onClick={() => setSection(s)}
                 aria-current={section === s ? "page" : undefined}
                 className={cn(
-                  "shrink-0 whitespace-nowrap rounded border px-2.5 text-xs",
-                  "min-h-10 tablet:min-h-0 tablet:py-1",
-                  "transition-colors duration-150",
+                  "shrink-0 whitespace-nowrap rounded-sm px-3 text-xs",
+                  "min-h-10 tablet:min-h-0 tablet:py-1.5",
+                  "transition-[box-shadow,color] duration-150",
                   "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent",
                   section === s
-                    ? "border-accent bg-accent-subtle font-medium text-accent"
-                    : "border-rule text-ink-2 hover:bg-sunken hover:text-ink",
+                    ? "bg-sunken font-medium text-accent shadow-inset-sm"
+                    : "bg-panel text-ink-2 shadow-raised-sm hover:text-ink",
                 )}
               >
                 {SECTION_LABEL[s]}
@@ -263,7 +263,7 @@ function Overview({
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded border border-rule bg-panel p-3">
+    <div className="rounded-md bg-panel shadow-raised p-3">
       <p className="label-key">{label}</p>
       <p className="mt-0.5 font-mono text-xl font-semibold tabular-nums text-ink">{value}</p>
     </div>

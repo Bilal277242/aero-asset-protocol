@@ -93,7 +93,7 @@ export function TransactionDialog({
           {!settled && !stopped && children}
 
           {summary && !stopped && (
-            <div className="rounded border border-rule bg-sunken p-3">
+            <div className="rounded-sm bg-sunken shadow-inset-sm p-3">
               <p className="label-key mb-1.5">What this does</p>
               <div className="grid gap-1 text-xs text-ink-2">{summary}</div>
             </div>
@@ -102,7 +102,7 @@ export function TransactionDialog({
           {tx.phase !== "idle" && <StageTrack tx={tx} />}
 
           {tx.phase === "rejected" && (
-            <div className="rounded border border-rule bg-sunken p-3">
+            <div className="rounded-sm bg-sunken shadow-inset-sm p-3">
               <p className="text-sm font-medium text-ink">Signature declined</p>
               <p className="mt-0.5 text-xs text-ink-2">
                 You dismissed the request in your wallet. Nothing was submitted and nothing

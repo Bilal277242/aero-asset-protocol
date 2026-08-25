@@ -186,7 +186,7 @@ export function EscrowPanel({
         </dl>
 
         {funding && account.isConnected && (
-          <div className="rounded border border-rule bg-sunken p-3">
+          <div className="rounded-sm bg-sunken shadow-inset-sm p-3">
             <p className="label-key mb-1.5">Your position</p>
             <dl className="grid gap-1 text-xs">
               <div className="flex justify-between">

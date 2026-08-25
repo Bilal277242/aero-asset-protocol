@@ -107,7 +107,7 @@ export function TransferAdminDialog({
           />
         </Field>
 
-        <div className="flex items-start gap-2 rounded-xs border border-rule bg-sunken px-2.5 py-2">
+        <div className="flex items-start gap-2 rounded-xs bg-sunken shadow-inset-sm px-2.5 py-2">
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-blocked" aria-hidden="true" />
           <p className="text-2xs leading-relaxed text-ink-2">
             The admin controls operators, the profile, and this transfer itself. An address

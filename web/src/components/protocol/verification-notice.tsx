@@ -30,7 +30,7 @@ export function VerificationNotice({
 }) {
   return (
     <section
-      className={cn("overflow-hidden rounded border border-rule bg-panel", className)}
+      className={cn("overflow-hidden rounded-md bg-panel shadow-raised", className)}
       aria-label="Verification status"
     >
       <div className="grid gap-px bg-rule tablet:grid-cols-2">

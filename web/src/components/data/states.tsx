@@ -96,7 +96,7 @@ export function ErrorState({
           {cause && <p className="mt-1 text-xs leading-relaxed text-ink-2">{cause}</p>}
           {remedy && <p className="mt-1.5 text-xs leading-relaxed text-ink">{remedy}</p>}
           {detail && (
-            <pre className="mt-2.5 overflow-x-auto rounded-xs border border-rule bg-sunken px-2.5 py-2 font-mono text-2xs text-ink-2">
+            <pre className="mt-2.5 overflow-x-auto rounded-xs bg-sunken shadow-inset-sm px-2.5 py-2 font-mono text-2xs text-ink-2">
               {detail}
             </pre>
           )}

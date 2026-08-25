@@ -217,7 +217,7 @@ export default function MaintenanceDetailPage() {
               description="What the contract stores, and what it does not."
             />
             <CardBody className="grid gap-2">
-              <div className="flex items-start gap-2 rounded border border-rule bg-sunken p-3">
+              <div className="flex items-start gap-2 rounded-sm bg-sunken shadow-inset-sm p-3">
                 <Lock className="mt-0.5 size-4 shrink-0 text-ink-3" aria-hidden="true" />
                 <div>
                   <p className="text-sm font-medium text-ink">

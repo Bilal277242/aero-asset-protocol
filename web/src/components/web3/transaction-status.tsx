@@ -33,7 +33,7 @@ export function TransactionStatus({ tx }: { tx: TxState }) {
 
   if (tx.phase === "rejected") {
     return (
-      <div className="rounded border border-rule bg-sunken p-3">
+      <div className="rounded-sm bg-sunken shadow-inset-sm p-3">
         <p className="text-sm font-medium text-ink">Signature declined</p>
         <p className="mt-0.5 text-xs text-ink-2">
           Nothing was submitted and nothing was charged. You can try again whenever you like.
@@ -91,7 +91,7 @@ export function TransactionStatus({ tx }: { tx: TxState }) {
   if (!current) return null;
 
   return (
-    <div className="rounded border border-rule bg-panel p-3" role="status" aria-live="polite">
+    <div className="rounded-md bg-panel shadow-raised p-3" role="status" aria-live="polite">
       <div className="flex items-center gap-2">
         <Spinner className="size-3.5 text-accent" />
         <p className="text-sm font-medium text-ink">{current.title}</p>

@@ -111,7 +111,7 @@ export default function DashboardPage() {
           }
         >
           {(data) => (
-            <div className="grid grid-cols-2 gap-px overflow-hidden rounded border border-rule bg-rule tablet:grid-cols-3 laptop:grid-cols-4">
+            <div className="grid grid-cols-2 gap-px overflow-hidden rounded-md bg-rule shadow-raised tablet:grid-cols-3 laptop:grid-cols-4">
               <Metric label="Assets" value={num(data.counts.assets)} href="/fleet" />
               <Metric
                 label="Verified assets"
@@ -261,7 +261,7 @@ export default function DashboardPage() {
           >
             {(data) => (
               <div className="grid gap-4">
-                <div className="grid grid-cols-2 gap-px overflow-hidden rounded border border-rule bg-rule">
+                <div className="grid grid-cols-2 gap-px overflow-hidden rounded-md bg-rule shadow-raised">
                   <Metric label="Organizations" value={data.total} />
                   <Metric label="Verified" value={data.verified} tone="confirmed" />
                   <Metric
@@ -298,7 +298,7 @@ export default function DashboardPage() {
           >
             {(data) => (
               <div className="grid gap-4">
-                <div className="grid grid-cols-2 gap-px overflow-hidden rounded border border-rule bg-rule">
+                <div className="grid grid-cols-2 gap-px overflow-hidden rounded-md bg-rule shadow-raised">
                   <Metric label="Records" value={data.total} />
                   <Metric
                     label="Backdated over 30 days"
@@ -355,7 +355,7 @@ export default function DashboardPage() {
         >
           {(data) => (
             <div className="grid gap-3">
-              <ol className="grid gap-px overflow-hidden rounded border border-rule bg-rule">
+              <ol className="grid gap-px overflow-hidden rounded-md bg-rule shadow-raised">
                 {data.items.map((item) => (
                   <li
                     key={item.id}

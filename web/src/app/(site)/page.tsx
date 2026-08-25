@@ -77,7 +77,7 @@ export default function HomePage() {
                 </Link>
                 <Link
                   href="/verification"
-                  className="inline-flex h-11 items-center justify-center rounded border border-rule bg-panel px-6 text-base font-medium text-ink transition-colors hover:border-ink-3 hover:bg-sunken"
+                  className="inline-flex h-11 items-center justify-center rounded-md bg-panel shadow-raised px-6 text-base font-medium text-ink transition-colors hover:border-ink-3 hover:bg-sunken"
                 >
                   Verify an asset
                 </Link>
@@ -234,7 +234,7 @@ export default function HomePage() {
             </dl>
           </div>
 
-          <div className="rounded border border-rule bg-panel p-4">
+          <div className="rounded-md bg-panel shadow-raised p-4">
             <p className="label-key mb-3">Passport · asset #1</p>
             <dl className="grid gap-2 text-sm">
               {[

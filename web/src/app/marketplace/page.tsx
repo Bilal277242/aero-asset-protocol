@@ -281,7 +281,7 @@ export default function MarketplacePage() {
         />
       )}
 
-      <section className="mt-8 rounded border border-rule bg-panel p-4">
+      <section className="mt-8 rounded-md bg-panel shadow-raised p-4">
         <h2 className="font-mono text-sm font-semibold tracking-tight text-ink">
           How a trade completes
         </h2>

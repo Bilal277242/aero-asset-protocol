@@ -39,7 +39,7 @@ export function VerificationStrip({
 }) {
   return (
     <section
-      className={cn("overflow-hidden rounded border border-rule bg-panel", className)}
+      className={cn("overflow-hidden rounded-md bg-panel shadow-raised", className)}
       aria-label="Record summary"
     >
       {/* Band 1 — what it is */}
